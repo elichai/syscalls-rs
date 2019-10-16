@@ -10,6 +10,7 @@ pub use x86_64::*;
 #[cfg(target_arch = "x86")]
 pub use i386::*;
 
+#[macro_export]
 macro_rules! syscall {
     ($n:expr) => {
         crate::arch::syscall0($n)
@@ -34,3 +35,9 @@ macro_rules! syscall {
     };
 }
 
+
+impl From<Syscalls> for isize {
+    fn from(sys: Syscalls) -> isize {
+        sys as isize
+    }
+}
