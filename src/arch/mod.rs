@@ -1,36 +1,36 @@
-mod x86_64;
 
+#[cfg(target_arch = "x86_64")]
+mod x86_64;
+#[cfg(target_arch = "x86")]
+mod i386;
+
+
+#[cfg(target_arch = "x86_64")]
 pub use x86_64::*;
+#[cfg(target_arch = "x86")]
+pub use i386::*;
 
 macro_rules! syscall {
     ($n:expr) => {
-        syscall0($n)
+        crate::arch::syscall0($n)
     };
     ($n:expr, $a1:expr) => {
-        syscall1($n, $a1)
+        crate::arch::syscall1($n, $a1)
     };
     ($n:expr, $a1:expr, $a2:expr) => {
-        syscall2($n, $a1, $a2)
+        crate::arch::syscall2($n, $a1, $a2)
     };
     ($n:expr, $a1:expr, $a2:expr, $a3:expr) => {
-        syscall3($n, $a1, $a2, $a3)
+        crate::arch::syscall3($n, $a1, $a2, $a3)
     };
     ($n:expr, $a1:expr, $a2:expr, $a3:expr, $a4:expr) => {
-        syscall4($n, $a1, $a2, $a3, $a4)
+        crate::arch::syscall4($n, $a1, $a2, $a3, $a4)
     };
     ($n:expr, $a1:expr, $a2:expr, $a3:expr, $a4:expr, $a5:expr) => {
-        syscall5($n, $a1, $a2, $a3, $a4, $a5)
+        crate::arch::syscall5($n, $a1, $a2, $a3, $a4, $a5)
     };
     ($n:expr, $a1:expr, $a2:expr, $a3:expr, $a4:expr, $a6:expr) => {
-        syscall6($n, $a1, $a2, $a3, $a4, $a6)
+        crate::arch::syscall6($n, $a1, $a2, $a3, $a4, $a6)
     };
 }
 
-#[cfg(test)]
-#[test]
-fn test_print() {
-    let write = 1;
-    let msg = "Hello World\n";
-    let res = unsafe { syscall!(write, 1, msg.as_ptr() as _, msg.len() as _) };
-    println!("res: {}", res);
-}

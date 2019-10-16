@@ -54,7 +54,7 @@ pub unsafe fn syscall6(n: c_long, a1: c_long, a2: c_long, a3: c_long, a4: c_long
     ret as c_long
 }
 
-
+#[allow(dead_code)]
 pub enum Syscalls {
     Read = 0,
     Write = 1,
