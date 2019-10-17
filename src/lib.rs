@@ -33,11 +33,75 @@ pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> Result<usize, io::Err
     }
 }
 
+pub unsafe fn read<F: AsRawFd>(fd: &F, buf: &mut [u8]) -> Result<usize, io::Error> {
+    let res = syscall!(
+        Syscalls::Read.into(),
+        fd.as_raw_fd() as isize,
+        buf.as_mut_ptr() as isize,
+        buf.len() as isize
+    );
+    if res < 0 {
+        Err(io::Error::from_raw_os_error(-res as i32))
+    } else {
+        Ok(res as usize)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::write;
+    use std::fs::{remove_file, File, OpenOptions};
     use std::io;
+    use std::io::{Write, Read, SeekFrom, Seek};
+    use std::ops::{Deref, DerefMut};
     use std::os::unix::io::{AsRawFd, RawFd};
+    use std::path::{Path, PathBuf};
+
+    struct TestFile(File, &'static Path);
+
+    impl TestFile {
+        pub fn new() -> io::Result<Self> {
+            let path = Path::new(".testfile");
+            let file = OpenOptions::new().write(true).create(true).read(true).open(path)?;
+            Ok(TestFile(file, path))
+        }
+        pub fn path(&self) -> &Path {
+            self.1
+        }
+    }
+
+    impl Drop for TestFile {
+        fn drop(&mut self) {
+            let _ = remove_file(self.1);
+        }
+    }
+
+    impl Deref for TestFile {
+        type Target = File;
+
+        fn deref(&self) -> &Self::Target {
+            &self.0
+        }
+    }
+
+    impl DerefMut for TestFile {
+        fn deref_mut(&mut self) -> &mut Self::Target {
+            &mut self.0
+        }
+    }
+
+    #[test]
+    fn test_read() {
+        let src = b"Hello World";
+        let mut dest = [0u8; 11];
+        let mut file = TestFile::new().unwrap();
+        file.write_all(src).unwrap();
+        file.seek(SeekFrom::Start(0));
+        file.sync_all();
+        let res = unsafe { super::read(file.deref(), &mut dest) }.unwrap();
+        assert_eq!(res, src.len());
+        assert_eq!(&dest, src);
+    }
 
     #[test]
     fn test_print() {

@@ -24,7 +24,7 @@ This library is an attempt to remove the libc dependency from rust with `x86_64-
  - [ ] listen
  - [ ] recvfrom
  - [ ] sendto
- - [ ] read
+ - [x] read
  - [ ] readv
  - [ ] pread64
  - [x] write
