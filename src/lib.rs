@@ -19,7 +19,7 @@ static_assert!(size_of::<isize>() >= size_of::<usize>());
 // TODO Update: So if we have an unsafe trait for `AsRawFd` than that will shift the responsibility to the implementor and should allow us to make this function safe.
 pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> Result<usize, io::Error> {
     let res = syscall!(
-        Syscalls::Write.into(),
+        Syscalls::Write,
         fd.as_raw_fd() as isize,
         msg.as_ptr() as isize,
         msg.len() as isize
@@ -35,7 +35,7 @@ pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> Result<usize, io::Err
 
 pub unsafe fn read<F: AsRawFd>(fd: &F, buf: &mut [u8]) -> Result<usize, io::Error> {
     let res = syscall!(
-        Syscalls::Read.into(),
+        Syscalls::Read,
         fd.as_raw_fd() as isize,
         buf.as_mut_ptr() as isize,
         buf.len() as isize
@@ -52,10 +52,10 @@ mod tests {
     use super::write;
     use std::fs::{remove_file, File, OpenOptions};
     use std::io;
-    use std::io::{Write, Read, SeekFrom, Seek};
+    use std::io::{Write, SeekFrom, Seek};
     use std::ops::{Deref, DerefMut};
     use std::os::unix::io::{AsRawFd, RawFd};
-    use std::path::{Path, PathBuf};
+    use std::path::Path;
 
     struct TestFile(File, &'static Path);
 
@@ -64,9 +64,6 @@ mod tests {
             let path = Path::new(".testfile");
             let file = OpenOptions::new().write(true).create(true).read(true).open(path)?;
             Ok(TestFile(file, path))
-        }
-        pub fn path(&self) -> &Path {
-            self.1
         }
     }
 
@@ -96,8 +93,7 @@ mod tests {
         let mut dest = [0u8; 11];
         let mut file = TestFile::new().unwrap();
         file.write_all(src).unwrap();
-        file.seek(SeekFrom::Start(0));
-        file.sync_all();
+        file.seek(SeekFrom::Start(0)).unwrap();
         let res = unsafe { super::read(file.deref(), &mut dest) }.unwrap();
         assert_eq!(res, src.len());
         assert_eq!(&dest, src);
@@ -106,9 +102,8 @@ mod tests {
     #[test]
     fn test_print() {
         let msg = "Hello World\n";
-        let res = unsafe { write(&mut io::stdout(), msg.as_bytes()) };
-        println!("res: {:?}", res);
-        assert!(res.is_ok());
+        let res = unsafe { write(&mut io::stdout(), msg.as_bytes()) }.unwrap();
+        assert_eq!(res, msg.len());
     }
 
     #[test]
@@ -121,7 +116,6 @@ mod tests {
         }
         let msg = "Hello World\n";
         let res = unsafe { write(&mut A, msg.as_bytes()) };
-        println!("res: {:?}", res);
         assert!(res.is_err());
         let err = res.unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::Other);
