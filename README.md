@@ -8,7 +8,9 @@ This library is an attempt to remove the libc dependency from rust with `x86_64-
 2. Should we provide syscalls only or library functions too? (only 2, or also 3?)
 3. If not then where should (3) be defined/implemented?
 4. How much should they be compatible with glibc? (i.e. threads?)
-
+5. Should we provide enums for the flags? or should the flag stay ints?
+6. Minimum Supported kernel version. how?. which?.
+7. Should we have our own types? (i.e. FileDescriptor type) traits?.
 
 ## List of syscalls used in rust/src/libstd:
 ### Kernel Calls(2)

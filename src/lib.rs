@@ -7,6 +7,12 @@ use arch::Syscalls;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, mem::size_of};
 
+// TODO: Remove libc. Currently *only* used for getting typedefs for flags.
+use libc::{O_TMPFILE, O_CREAT};
+use std::ffi::CStr;
+
+
+
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
 static_assert!(size_of::<isize>() >= size_of::<RawFd>());
@@ -17,7 +23,7 @@ static_assert!(size_of::<isize>() >= size_of::<usize>());
 // TODO: Read into all ways that writing the a "bad" file descriptor violate rust's safety.
 // TODO: Or find a way to make a trait that shifts the responsibility of saftey to the implementor of the trait.
 // TODO Update: So if we have an unsafe trait for `AsRawFd` than that will shift the responsibility to the implementor and should allow us to make this function safe.
-pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> Result<usize, io::Error> {
+pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> io::Result<usize> {
     let res = syscall!(
         Syscalls::Write,
         fd.as_raw_fd() as isize,
@@ -33,12 +39,37 @@ pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> Result<usize, io::Err
     }
 }
 
-pub unsafe fn read<F: AsRawFd>(fd: &F, buf: &mut [u8]) -> Result<usize, io::Error> {
+pub unsafe fn read<F: AsRawFd>(fd: &F, buf: &mut [u8]) -> io::Result<usize> {
     let res = syscall!(
         Syscalls::Read,
         fd.as_raw_fd() as isize,
         buf.as_mut_ptr() as isize,
         buf.len() as isize
+    );
+    if res < 0 {
+        Err(io::Error::from_raw_os_error(-res as i32))
+    } else {
+        Ok(res as usize)
+    }
+}
+
+
+// TODO: Should we just call openat? (that's what glibc and the kernel itself do).
+pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<usize> {
+    // TODO: Look into a `#ifdef __O_TMPFILE` in glibc. are there times when we don't care about this? Maybe old kernels?.
+    let mut mode_t = 0;
+    if (oflags & O_CREAT) != 0 || (oflags & O_TMPFILE) == O_TMPFILE {
+        if let Some(mode) = mode {
+            mode_t = mode;
+        } else {
+            return Err(io::Error::new(io::ErrorKind::InvalidInput, "Used O_CREAT/O_TMPFILE but didn't provide a mode"));
+        }
+    }
+    let res = syscall!(
+        Syscalls::Open,
+        path.as_ptr() as isize,
+        oflags as isize,
+        mode_t as isize
     );
     if res < 0 {
         Err(io::Error::from_raw_os_error(-res as i32))
@@ -55,21 +86,26 @@ mod tests {
     use std::io::{Write, SeekFrom, Seek};
     use std::ops::{Deref, DerefMut};
     use std::os::unix::io::{AsRawFd, RawFd};
-    use std::path::Path;
+    use std::path::PathBuf;
+    use std::thread::current;
+    use std::ffi::CString;
+    use std::os::unix::io::FromRawFd;
 
-    struct TestFile(File, &'static Path);
+    use libc::{O_CLOEXEC, O_SYNC};
+
+    struct TestFile(File, PathBuf);
 
     impl TestFile {
         pub fn new() -> io::Result<Self> {
-            let path = Path::new(".testfile");
-            let file = OpenOptions::new().write(true).create(true).read(true).open(path)?;
+            let path = PathBuf::from(&format!("{:?}.testfile", current().id()));
+            let file = OpenOptions::new().write(true).create(true).read(true).open(&path)?;
             Ok(TestFile(file, path))
         }
     }
 
     impl Drop for TestFile {
         fn drop(&mut self) {
-            let _ = remove_file(self.1);
+            let _ = remove_file(&self.1);
         }
     }
 
@@ -85,6 +121,23 @@ mod tests {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
         }
+    }
+
+    #[test]
+    fn test_open() {
+        let src = b"Hello World";
+        let mut dest = [0u8; 11];
+        let path = CString::new(format!("{:?}.testfile", current().id())).unwrap();
+        let mut file = File::create(path.to_str().unwrap()).unwrap();
+        file.write_all(src).unwrap();
+        drop(file);
+
+        let fd = unsafe {super::open(&path, O_CLOEXEC|O_SYNC, None )}.unwrap();
+        let file = unsafe { File::from_raw_fd(fd as i32) };
+        let res = unsafe { super::read(&file, &mut dest) }.unwrap();
+        let _ = remove_file(path.to_str().unwrap());
+        assert_eq!(res, src.len());
+        assert_eq!(&dest, src);
     }
 
     #[test]
