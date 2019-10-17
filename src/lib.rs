@@ -16,6 +16,7 @@ static_assert!(size_of::<isize>() >= size_of::<usize>());
 // TODO: Is there any way to make this safe? https://github.com/rust-lang/rfcs/issues/1043#issuecomment-542904091
 // TODO: Read into all ways that writing the a "bad" file descriptor violate rust's safety.
 // TODO: Or find a way to make a trait that shifts the responsibility of saftey to the implementor of the trait.
+// TODO Update: So if we have an unsafe trait for `AsRawFd` than that will shift the responsibility to the implementor and should allow us to make this function safe.
 pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> Result<usize, io::Error> {
     let res = syscall!(
         Syscalls::Write.into(),
