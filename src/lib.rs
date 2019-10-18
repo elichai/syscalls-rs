@@ -4,14 +4,12 @@ mod arch;
 pub(crate) mod utils;
 
 use arch::Syscalls;
+use std::ffi::CStr;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, mem::size_of};
 
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
-use libc::{O_TMPFILE, O_CREAT};
-use std::ffi::CStr;
-
-
+use libc::{O_CREAT, O_TMPFILE};
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
@@ -30,13 +28,7 @@ pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> io::Result<usize> {
         msg.as_ptr() as isize,
         msg.len() as isize
     );
-    if res < 0 {
-        // TODO: Is there a better way to do this then negating twice? maybe checking if the MSB is set? is that even better?
-        // TODO: Add our own Error enum with all the errors in errno.h
-        Err(io::Error::from_raw_os_error(-res as i32))
-    } else {
-        Ok(res as usize)
-    }
+    result!(res)
 }
 
 pub unsafe fn read<F: AsRawFd>(fd: &F, buf: &mut [u8]) -> io::Result<usize> {
@@ -46,15 +38,11 @@ pub unsafe fn read<F: AsRawFd>(fd: &F, buf: &mut [u8]) -> io::Result<usize> {
         buf.as_mut_ptr() as isize,
         buf.len() as isize
     );
-    if res < 0 {
-        Err(io::Error::from_raw_os_error(-res as i32))
-    } else {
-        Ok(res as usize)
-    }
+    result!(res)
 }
 
-
 // TODO: Should we just call openat? (that's what glibc and the kernel itself do).
+// In kernels older than 3.2 this requires a special racy handling for FD_CLOEXEC. But rust doesn't support these kernels anyway https://github.com/rust-lang/libc/issues/1412#issuecomment-543621431
 pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<usize> {
     // TODO: Look into a `#ifdef __O_TMPFILE` in glibc. are there times when we don't care about this? Maybe old kernels?.
     let mut mode_t = 0;
@@ -62,7 +50,10 @@ pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<us
         if let Some(mode) = mode {
             mode_t = mode;
         } else {
-            return Err(io::Error::new(io::ErrorKind::InvalidInput, "Used O_CREAT/O_TMPFILE but didn't provide a mode"));
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "Used O_CREAT/O_TMPFILE but didn't provide a mode",
+            ));
         }
     }
     let res = syscall!(
@@ -71,25 +62,19 @@ pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<us
         oflags as isize,
         mode_t as isize
     );
-    if res < 0 {
-        Err(io::Error::from_raw_os_error(-res as i32))
-    } else {
-        Ok(res as usize)
-    }
+    result!(res)
 }
 
 #[cfg(test)]
 mod tests {
     use super::write;
+    use std::ffi::CString;
     use std::fs::{remove_file, File, OpenOptions};
-    use std::io;
-    use std::io::{Write, SeekFrom, Seek};
+    use std::io::{self, Seek, SeekFrom, Write};
     use std::ops::{Deref, DerefMut};
-    use std::os::unix::io::{AsRawFd, RawFd};
+    use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
     use std::path::PathBuf;
     use std::thread::current;
-    use std::ffi::CString;
-    use std::os::unix::io::FromRawFd;
 
     use libc::{O_CLOEXEC, O_SYNC};
 
@@ -98,7 +83,11 @@ mod tests {
     impl TestFile {
         pub fn new() -> io::Result<Self> {
             let path = PathBuf::from(&format!("{:?}.testfile", current().id()));
-            let file = OpenOptions::new().write(true).create(true).read(true).open(&path)?;
+            let file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .read(true)
+                .open(&path)?;
             Ok(TestFile(file, path))
         }
     }
@@ -132,7 +121,7 @@ mod tests {
         file.write_all(src).unwrap();
         drop(file);
 
-        let fd = unsafe {super::open(&path, O_CLOEXEC|O_SYNC, None )}.unwrap();
+        let fd = unsafe { super::open(&path, O_CLOEXEC | O_SYNC, None) }.unwrap();
         let file = unsafe { File::from_raw_fd(fd as i32) };
         let res = unsafe { super::read(&file, &mut dest) }.unwrap();
         let _ = remove_file(path.to_str().unwrap());

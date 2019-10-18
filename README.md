@@ -11,7 +11,9 @@ This library is an attempt to remove the libc dependency from rust with `x86_64-
 5. Should we provide enums for the flags? or should the flag stay ints?
 6. Minimum Supported kernel version. how?. which?.
 7. Should we have our own types? (i.e. FileDescriptor type) traits?.
-
+8. fnctl: according to the man page `However, these details can be ignored by applications using glibc,whose fcntl() wrapper function transparently employs the more recentsystem call where it is available.`
+looking at glibc code it does some work and then calls `fcntl64`. should we just only implement `fcntl64`? should we wrap that?
+9. glibc uses `SYSCALL_CANCEL` which calls `LIBC_CANCEL_ASYNC` incase of multithreading. should we look into that? what are the implications of this?
 ## List of syscalls used in rust/src/libstd:
 ### Kernel Calls(2)
  - [ ] exit
