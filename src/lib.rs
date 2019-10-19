@@ -140,6 +140,18 @@ pub unsafe fn getrandom(buf: &mut [u8], flags: u32) -> io::Result<usize> {
     result!(res)
 }
 
+
+// TODO: Any better abstraction for the pid? (https://doc.rust-lang.org/std/process/struct.Child.html#method.id)
+#[inline]
+pub unsafe fn kill(pid: u32, signal: i32) -> io::Result<usize> {
+    let res = syscall!(
+        Syscalls::Kill,
+        pid as isize,
+        signal as isize
+    );
+    result!(res)
+}
+
 pub enum FcntlArg<'a> {
     Flock(&'a mut flock),
     Flags(u32),
@@ -210,7 +222,8 @@ mod tests {
     use std::thread::current;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use libc::{GRND_NONBLOCK, GRND_RANDOM, O_CLOEXEC, O_RDWR, O_SYNC};
+    use libc::{GRND_NONBLOCK, GRND_RANDOM, O_CLOEXEC, O_RDWR, O_SYNC, SIGTERM};
+    use std::process::Command;
 
     struct TestFile(File, PathBuf);
 
@@ -244,6 +257,15 @@ mod tests {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
         }
+    }
+
+    #[test]
+    fn test_kill() {
+        let mut child = Command::new("cat").spawn().unwrap();
+        let res = unsafe { super::kill(child.id(), SIGTERM)}.unwrap();
+        assert_eq!(res, 0);
+        let res = child.wait().unwrap().code();
+        assert_eq!(res, None);
     }
 
     #[test]
