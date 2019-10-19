@@ -128,6 +128,18 @@ pub fn gettimeofday() -> io::Result<timeval> {
     }
 }
 
+// TODO: There are only 2 falgs. should we just make it an enum?(Open question 5)
+#[inline]
+pub unsafe fn getrandom(buf: &mut [u8], flags: u32) -> io::Result<usize> {
+    let res = syscall!(
+        Syscalls::Getrandom,
+        buf.as_mut_ptr() as isize,
+        buf.len() as isize,
+        flags as isize
+    );
+    result!(res)
+}
+
 pub enum FcntlArg<'a> {
     Flock(&'a mut flock),
     Flags(u32),
@@ -196,10 +208,9 @@ mod tests {
     use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
     use std::path::{Path, PathBuf};
     use std::thread::current;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
-    use libc::{O_CLOEXEC, O_RDWR, O_SYNC};
-    use std::alloc::System;
-    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+    use libc::{GRND_NONBLOCK, GRND_RANDOM, O_CLOEXEC, O_RDWR, O_SYNC};
 
     struct TestFile(File, PathBuf);
 
@@ -233,6 +244,14 @@ mod tests {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
         }
+    }
+
+    #[test]
+    fn test_rand() {
+        let mut buf = [0u8; 32];
+        let res = unsafe { super::getrandom(&mut buf, GRND_RANDOM | GRND_NONBLOCK) }.unwrap();
+        assert_eq!(res, buf.len());
+        assert_ne!(buf, [0u8; 32]);
     }
 
     #[test]

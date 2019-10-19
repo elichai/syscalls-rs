@@ -88,7 +88,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] WIFEXITED
  - [ ] WEXITSTATUS
  - [ ] WTERMSIG
- - [ ] getrandom
+ - [x] getrandom
  - [ ] sigaltstack
  - [ ] sigaction
  - [ ] mmap
