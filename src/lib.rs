@@ -9,7 +9,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, mem::size_of};
 
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
-use libc::{O_CREAT, O_TMPFILE};
+use libc::{flock, O_CREAT, O_TMPFILE};
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
@@ -63,6 +63,63 @@ pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<us
         mode_t as isize
     );
     result!(res)
+}
+
+pub enum FcntlArg<'a> {
+    Flock(&'a mut flock),
+    Flags(u32),
+    None,
+}
+
+impl From<FcntlArg<'_>> for isize {
+    fn from(arg: FcntlArg) -> isize {
+        match arg {
+            FcntlArg::Flock(r) => r as *mut flock as isize,
+            FcntlArg::Flags(flag) => flag as isize,
+            FcntlArg::None => 0isize,
+        }
+    }
+}
+
+// Should I use the flock struct internally only and expose those details to in normal rust types?.
+pub enum FcntlCommand<'a, F: AsRawFd> {
+    Duplicate(&'a F), // TODO: Better abstraction for these 2 modes?
+    DuplicateCloseExec(&'a F),
+    GetFlags,
+    SetFlags(i32),
+    GetFileStatusAndAccessMode,
+    SetFileStatus(i32),
+    SetLock(&'a flock),
+    SetLockWait(&'a flock),
+    GetLock(&'a mut flock), // TODO: Consider making it a return value.
+}
+
+impl<F: AsRawFd> FcntlCommand<'_, F> {
+    pub fn as_isize(&self) -> isize {
+        use libc::{
+            F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLK, F_SETFD, F_SETFL, F_SETLK,
+            F_SETLKW,
+        };
+        use FcntlCommand::*;
+        (match self {
+            Duplicate(_) => F_DUPFD,
+            DuplicateCloseExec(_) => F_DUPFD_CLOEXEC,
+            GetFlags => F_GETFD,
+            SetFlags(_) => F_SETFD,
+            GetFileStatusAndAccessMode => F_GETFL,
+            SetFileStatus(_) => F_SETFL,
+            SetLock(_) => F_SETLK,
+            SetLockWait(_) => F_SETLKW,
+            GetLock(_) => F_GETLK,
+        }) as isize
+    }
+}
+
+// TODO: Both musl and glibc has ifdefs on `__USE_FILE_OFFSET64` and `__USE_LARGEFILE64` on 32bit machines. for a bigger `off_t` in flock.
+pub unsafe fn fcntl<F: AsRawFd>(fd: F, cmd: u32, arg: FcntlArg) -> io::Result<usize> {
+    let _ = (fd, cmd, arg);
+    unimplemented!();
+    // TODO: Requires a deeper thought and discussion on how these should be done best.
 }
 
 #[cfg(test)]

@@ -1,14 +1,12 @@
-
-#[cfg(target_arch = "x86_64")]
-mod x86_64;
 #[cfg(target_arch = "x86")]
 mod i386;
-
-
 #[cfg(target_arch = "x86_64")]
-pub use x86_64::*;
+mod x86_64;
+
 #[cfg(target_arch = "x86")]
 pub use i386::*;
+#[cfg(target_arch = "x86_64")]
+pub use x86_64::*;
 
 #[macro_export]
 macro_rules! syscall {
@@ -34,7 +32,6 @@ macro_rules! syscall {
         crate::arch::syscall6($n.into(), $a1, $a2, $a3, $a4, $a6)
     };
 }
-
 
 impl From<Syscalls> for isize {
     fn from(sys: Syscalls) -> isize {

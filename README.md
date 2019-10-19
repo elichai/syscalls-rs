@@ -14,6 +14,9 @@ This library is an attempt to remove the libc dependency from rust with `x86_64-
 8. fnctl: according to the man page `However, these details can be ignored by applications using glibc,whose fcntl() wrapper function transparently employs the more recentsystem call where it is available.`
 looking at glibc code it does some work and then calls `fcntl64`. should we just only implement `fcntl64`? should we wrap that?
 9. glibc uses `SYSCALL_CANCEL` which calls `LIBC_CANCEL_ASYNC` incase of multithreading. should we look into that? what are the implications of this?
+10. Should we split some syscalls into multiple functions? i.e. we could split `fnctl` into a function where the third argument is(`*mut flock`) and one where it's an int(and one without a third argument).
+
+
 ## List of syscalls used in rust/src/libstd:
 ### Kernel Calls(2)
  - [ ] exit
