@@ -86,11 +86,18 @@ pub fn _exit(status: i32) -> ! {
     }
 }
 
-#[inline]
 // TODO: glibc just calls mkdirat with AT_FDCWD. musl has this as an ifdef. what should we do?.
 // TODO: Should we return Result<()>?.
+#[inline]
 pub unsafe fn mkdir(path: &CStr, mode: i32) -> io::Result<usize> {
     let res = syscall!(Syscalls::Mkdir, path.as_ptr() as isize, mode as isize);
+    result!(res)
+}
+
+// TODO: same comments as for mkdir but here it's `mrdir` vs `unlinkat`
+#[inline]
+pub unsafe fn rmdir(path: &CStr) -> io::Result<usize> {
+    let res = syscall!(Syscalls::Rmdir, path.as_ptr() as isize);
     result!(res)
 }
 
@@ -155,8 +162,8 @@ pub unsafe fn fcntl<F: AsRawFd>(fd: F, cmd: u32, arg: FcntlArg) -> io::Result<us
 #[cfg(test)]
 mod tests {
     use super::write;
-    use std::ffi::{CStr, CString};
-    use std::fs::{remove_dir, remove_file, File, OpenOptions};
+    use std::ffi::CString;
+    use std::fs::{remove_file, File, OpenOptions};
     use std::io::{self, Seek, SeekFrom, Write};
     use std::ops::{Deref, DerefMut};
     use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
@@ -200,14 +207,16 @@ mod tests {
     }
 
     #[test]
-    fn test_mkdir() {
+    fn test_mkdir_rmdir() {
         let path = ".testdir";
         let c_path = CString::new(path).unwrap();
         let res = unsafe { super::mkdir(&c_path, O_RDWR) }.unwrap();
         assert_eq!(res, 0);
         let path = Path::new(path);
         assert!(path.exists());
-        remove_dir(path).unwrap();
+        let res = unsafe { super::rmdir(&c_path) }.unwrap();
+        assert_eq!(res, 0);
+        assert!(!path.exists());
     }
 
     #[test]

@@ -60,7 +60,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] unlink
  - [ ] rename
  - [ ] chmod
- - [ ] rmdir
+ - [x] rmdir
  - [ ] readlink
  - [ ] symlink
  - [ ] link
