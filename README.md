@@ -22,7 +22,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] ftruncate
  - [ ] pread
  - [ ] pwrite
- - [ ] gettimeofday
+ - [x] gettimeofday
  - [ ] connect
  - [ ] getsockname
  - [ ] getpeername

@@ -6,11 +6,12 @@ pub(crate) mod utils;
 
 use arch::Syscalls;
 use std::ffi::CStr;
+use std::mem::MaybeUninit;
 use std::os::unix::io::{AsRawFd, RawFd};
-use std::{io, mem::size_of};
+use std::{io, mem::size_of, ptr};
 
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
-use libc::{flock, O_CREAT, O_LARGEFILE, O_TMPFILE};
+use libc::{flock, timeval, O_CREAT, O_LARGEFILE, O_TMPFILE};
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
@@ -108,6 +109,25 @@ pub unsafe fn close<F: AsRawFd>(fd: &F) -> io::Result<usize> {
     result!(res)
 }
 
+// The timezone is useless. see man gettimeofday(2).
+#[inline]
+pub fn gettimeofday() -> io::Result<timeval> {
+    let mut time: MaybeUninit<timeval> = MaybeUninit::uninit();
+    let res = unsafe {
+        syscall!(
+            Syscalls::Gettimeofday,
+            time.as_mut_ptr() as isize,
+            ptr::null_mut::<()>() as isize
+        )
+    };
+    if res < 0 {
+        Err(io::Error::from_raw_os_error(-res as i32))
+    } else {
+        debug_assert_eq!(res, 0);
+        unsafe { Ok(time.assume_init()) }
+    }
+}
+
 pub enum FcntlArg<'a> {
     Flock(&'a mut flock),
     Flags(u32),
@@ -178,6 +198,8 @@ mod tests {
     use std::thread::current;
 
     use libc::{O_CLOEXEC, O_RDWR, O_SYNC};
+    use std::alloc::System;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
     struct TestFile(File, PathBuf);
 
@@ -211,6 +233,19 @@ mod tests {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
         }
+    }
+
+    #[test]
+    fn test_gettimeofday() {
+        const MICROS: i128 = 1_000_000;
+        let sys_time = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_micros() as i128;
+        let time = super::gettimeofday().unwrap();
+        let gettime: i128 = time.tv_usec as i128 + (time.tv_sec as i128 * MICROS);
+        let diff = sys_time - gettime;
+        assert!(diff.abs() < MICROS); // the diff is less than a second.
     }
 
     #[test]
