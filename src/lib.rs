@@ -9,7 +9,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, mem::size_of};
 
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
-use libc::{flock, O_CREAT, O_TMPFILE};
+use libc::{flock, O_CREAT, O_TMPFILE, O_LARGEFILE};
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
@@ -65,6 +65,11 @@ pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<us
     result!(res)
 }
 
+
+// TODO: maybe this should just be the default?.
+pub unsafe fn open64(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<usize> {
+    open(path, oflags | O_LARGEFILE, mode)
+}
 pub enum FcntlArg<'a> {
     Flock(&'a mut flock),
     Flags(u32),

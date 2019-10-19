@@ -46,14 +46,14 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] ftruncate64
  - [ ] lseek64
  - [ ] dirent64
- - [ ] open64
+ - [x] open64
  - [ ] fstatat64
  - [ ] stat
  - [ ] fstat
  - [ ] fstatat
  - [ ] lstat
  - [ ] dirent
- - [ ] open
+ - [x] open
  - [ ] fdatasync
  - [ ] fsync
  - [ ] fchmod
