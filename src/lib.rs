@@ -101,6 +101,13 @@ pub unsafe fn rmdir(path: &CStr) -> io::Result<usize> {
     result!(res)
 }
 
+// TODO: musl has an aio barrier, glibc uses SYSCALL_CANCEL. what should we do here?.
+#[inline]
+pub unsafe fn close<F: AsRawFd>(fd: &F) -> io::Result<usize> {
+    let res = syscall!(Syscalls::Close, fd.as_raw_fd() as isize);
+    result!(res)
+}
+
 pub enum FcntlArg<'a> {
     Flock(&'a mut flock),
     Flags(u32),
@@ -204,6 +211,16 @@ mod tests {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
         }
+    }
+
+    #[test]
+    fn test_close() {
+        let file = TestFile::new().unwrap();
+        let res = unsafe { super::close(file.deref()) }.unwrap();
+        assert_eq!(res, 0);
+        let err = unsafe { super::close(file.deref()) }.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::Other);
+        assert_eq!(err.to_string(), "Bad file descriptor (os error 9)");
     }
 
     #[test]
