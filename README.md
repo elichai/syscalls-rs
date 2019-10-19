@@ -19,7 +19,6 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
 
 ## List of syscalls used in rust/src/libstd:
 ### Kernel Calls(2)
- - [ ] exit
  - [ ] ftruncate
  - [ ] pread
  - [ ] pwrite
@@ -80,7 +79,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] pipe
  - [ ] kill
  - [ ] fork
- - [ ] _exit
+ - [x] _exit
  - [ ] dup2
  - [ ] setgid
  - [ ] setgroups
@@ -102,6 +101,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
 
 
 ### glibc implemented(3)
+ - [ ] exit
  - [ ] strlen
  - [ ] unsetenv
  - [ ] setenv

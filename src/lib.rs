@@ -70,6 +70,18 @@ pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<us
 pub unsafe fn open64(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<usize> {
     open(path, oflags | O_LARGEFILE, mode)
 }
+
+// TODO: Is there any reason to make this unsafe?.
+pub fn _exit(status: i32) -> ! {
+    loop {
+        unsafe {
+            syscall!(Syscalls::ExitGroup, status as isize);
+            syscall!(Syscalls::Exit, status as isize);
+        }
+    }
+}
+
+
 pub enum FcntlArg<'a> {
     Flock(&'a mut flock),
     Flags(u32),
@@ -172,6 +184,19 @@ mod tests {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
         }
+    }
+
+    #[test]
+    #[ignore]
+    fn test_exit_pass() {
+        super::_exit(0);
+    }
+
+
+    #[test]
+    #[ignore]
+    fn test_exit_fail() {
+        super::_exit(1);
     }
 
     #[test]
