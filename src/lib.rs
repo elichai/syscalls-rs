@@ -1,4 +1,5 @@
 #![feature(asm)]
+#![allow(clippy::missing_safety_doc)]
 
 mod arch;
 pub(crate) mod utils;
@@ -9,7 +10,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, mem::size_of};
 
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
-use libc::{flock, O_CREAT, O_TMPFILE, O_LARGEFILE};
+use libc::{flock, O_CREAT, O_LARGEFILE, O_TMPFILE};
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
@@ -21,6 +22,7 @@ static_assert!(size_of::<isize>() >= size_of::<usize>());
 // TODO: Read into all ways that writing the a "bad" file descriptor violate rust's safety.
 // TODO: Or find a way to make a trait that shifts the responsibility of saftey to the implementor of the trait.
 // TODO Update: So if we have an unsafe trait for `AsRawFd` than that will shift the responsibility to the implementor and should allow us to make this function safe.
+#[inline]
 pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> io::Result<usize> {
     let res = syscall!(
         Syscalls::Write,
@@ -31,6 +33,7 @@ pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> io::Result<usize> {
     result!(res)
 }
 
+#[inline]
 pub unsafe fn read<F: AsRawFd>(fd: &F, buf: &mut [u8]) -> io::Result<usize> {
     let res = syscall!(
         Syscalls::Read,
@@ -43,6 +46,7 @@ pub unsafe fn read<F: AsRawFd>(fd: &F, buf: &mut [u8]) -> io::Result<usize> {
 
 // TODO: Should we just call openat? (that's what glibc and the kernel itself do).
 // In kernels older than 3.2 this requires a special racy handling for FD_CLOEXEC. But rust doesn't support these kernels anyway https://github.com/rust-lang/libc/issues/1412#issuecomment-543621431
+#[inline]
 pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<usize> {
     // TODO: Look into a `#ifdef __O_TMPFILE` in glibc. are there times when we don't care about this? Maybe old kernels?.
     let mut mode_t = 0;
@@ -65,13 +69,14 @@ pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<us
     result!(res)
 }
 
-
 // TODO: maybe this should just be the default?.
+#[inline]
 pub unsafe fn open64(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<usize> {
     open(path, oflags | O_LARGEFILE, mode)
 }
 
 // TODO: Is there any reason to make this unsafe?.
+#[inline]
 pub fn _exit(status: i32) -> ! {
     loop {
         unsafe {
@@ -80,7 +85,6 @@ pub fn _exit(status: i32) -> ! {
         }
     }
 }
-
 
 pub enum FcntlArg<'a> {
     Flock(&'a mut flock),
@@ -133,6 +137,7 @@ impl<F: AsRawFd> FcntlCommand<'_, F> {
 }
 
 // TODO: Both musl and glibc has ifdefs on `__USE_FILE_OFFSET64` and `__USE_LARGEFILE64` on 32bit machines. for a bigger `off_t` in flock.
+#[inline]
 pub unsafe fn fcntl<F: AsRawFd>(fd: F, cmd: u32, arg: FcntlArg) -> io::Result<usize> {
     let _ = (fd, cmd, arg);
     unimplemented!();
@@ -191,7 +196,6 @@ mod tests {
     fn test_exit_pass() {
         super::_exit(0);
     }
-
 
     #[test]
     #[ignore]

@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 #[inline]
+#[rustfmt::skip]
 pub unsafe fn syscall0(n: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n) : "rcx", "r11", "memory" : "volatile"};
@@ -8,6 +9,7 @@ pub unsafe fn syscall0(n: isize) -> isize {
 }
 
 #[inline]
+#[rustfmt::skip]
 pub unsafe fn syscall1(n: isize, a1: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) : "rcx", "r11", "memory" : "volatile"};
@@ -15,6 +17,7 @@ pub unsafe fn syscall1(n: isize, a1: isize) -> isize {
 }
 
 #[inline]
+#[rustfmt::skip]
 pub unsafe fn syscall2(n: isize, a1: isize, a2: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2)
@@ -23,6 +26,7 @@ pub unsafe fn syscall2(n: isize, a1: isize, a2: isize) -> isize {
 }
 
 #[inline]
+#[rustfmt::skip]
 pub unsafe fn syscall3(n: isize, a1: isize, a2: isize, a3: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
@@ -31,6 +35,7 @@ pub unsafe fn syscall3(n: isize, a1: isize, a2: isize, a3: isize) -> isize {
 }
 
 #[inline]
+#[rustfmt::skip]
 pub unsafe fn syscall4(n: isize, a1: isize, a2: isize, a3: isize, a4: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
@@ -39,6 +44,7 @@ pub unsafe fn syscall4(n: isize, a1: isize, a2: isize, a3: isize, a4: isize) -> 
 }
 
 #[inline]
+#[rustfmt::skip]
 pub unsafe fn syscall5(n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
@@ -47,6 +53,7 @@ pub unsafe fn syscall5(n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5:
 }
 
 #[inline]
+#[rustfmt::skip]
 pub unsafe fn syscall6(n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5: isize, a6: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
@@ -404,11 +411,3 @@ pub enum Syscalls {
     PidfdOpen = 434,
     Clone3 = 435,
 }
-
-
-
-
-
-
-
-
