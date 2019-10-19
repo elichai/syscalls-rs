@@ -86,6 +86,14 @@ pub fn _exit(status: i32) -> ! {
     }
 }
 
+#[inline]
+// TODO: glibc just calls mkdirat with AT_FDCWD. musl has this as an ifdef. what should we do?.
+// TODO: Should we return Result<()>?.
+pub unsafe fn mkdir(path: &CStr, mode: i32) -> io::Result<usize> {
+    let res = syscall!(Syscalls::Mkdir, path.as_ptr() as isize, mode as isize);
+    result!(res)
+}
+
 pub enum FcntlArg<'a> {
     Flock(&'a mut flock),
     Flags(u32),
@@ -147,15 +155,15 @@ pub unsafe fn fcntl<F: AsRawFd>(fd: F, cmd: u32, arg: FcntlArg) -> io::Result<us
 #[cfg(test)]
 mod tests {
     use super::write;
-    use std::ffi::CString;
-    use std::fs::{remove_file, File, OpenOptions};
+    use std::ffi::{CStr, CString};
+    use std::fs::{remove_dir, remove_file, File, OpenOptions};
     use std::io::{self, Seek, SeekFrom, Write};
     use std::ops::{Deref, DerefMut};
     use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::thread::current;
 
-    use libc::{O_CLOEXEC, O_SYNC};
+    use libc::{O_CLOEXEC, O_RDWR, O_SYNC};
 
     struct TestFile(File, PathBuf);
 
@@ -189,6 +197,17 @@ mod tests {
         fn deref_mut(&mut self) -> &mut Self::Target {
             &mut self.0
         }
+    }
+
+    #[test]
+    fn test_mkdir() {
+        let path = ".testdir";
+        let c_path = CString::new(path).unwrap();
+        let res = unsafe { super::mkdir(&c_path, O_RDWR) }.unwrap();
+        assert_eq!(res, 0);
+        let path = Path::new(path);
+        assert!(path.exists());
+        remove_dir(path).unwrap();
     }
 
     #[test]
@@ -240,7 +259,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fail() {
+    fn test_write_fail() {
         struct A;
         impl AsRawFd for A {
             fn as_raw_fd(&self) -> RawFd {
