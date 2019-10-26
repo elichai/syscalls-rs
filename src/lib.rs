@@ -11,7 +11,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, mem::size_of, ptr};
 
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
-use libc::{flock, timeval, O_CREAT, O_LARGEFILE, O_TMPFILE};
+use libc::{flock, timeval, O_CREAT, O_LARGEFILE, O_TMPFILE, RENAME_EXCHANGE, RENAME_NOREPLACE};
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
@@ -140,14 +140,38 @@ pub unsafe fn getrandom(buf: &mut [u8], flags: u32) -> io::Result<usize> {
     result!(res)
 }
 
-
 // TODO: Any better abstraction for the pid? (https://doc.rust-lang.org/std/process/struct.Child.html#method.id)
 #[inline]
 pub unsafe fn kill(pid: u32, signal: i32) -> io::Result<usize> {
+    let res = syscall!(Syscalls::Kill, pid as isize, signal as isize);
+    result!(res)
+}
+
+// `RENAME_EXCHANGE` and `RENAME_NOREPLACE` are mutually exclusive. so make sense to have an enum.
+// TODO: Linux 3.18+ supports also `RENAME_WHITEOUT`. Open Question 12.
+pub enum RenameAt2Flags {
+    ExchangeAtomically = RENAME_EXCHANGE as isize,
+    RenameOnly = RENAME_NOREPLACE as isize,
+}
+
+// TODO: Should we return Result<()>?.
+// TODO: Should we check if the path is absolute and if so pass 0 for the file descriptor? should the file descriptor be optional with 0 default?
+#[inline]
+pub unsafe fn renameat2<F1: AsRawFd, F2: AsRawFd>(
+    old_fd: &F1,
+    old_path: &CStr,
+    new_fd: &F2,
+    new_path: &CStr,
+    flags: Option<RenameAt2Flags>,
+) -> io::Result<usize> {
+    let flags = flags.map(|f| f as isize).unwrap_or(0);
     let res = syscall!(
-        Syscalls::Kill,
-        pid as isize,
-        signal as isize
+        Syscalls::Renameat2,
+        old_fd.as_raw_fd() as isize,
+        old_path.as_ptr() as isize,
+        new_fd.as_raw_fd() as isize,
+        new_path.as_ptr() as isize,
+        flags,
     );
     result!(res)
 }
@@ -213,29 +237,38 @@ pub unsafe fn fcntl<F: AsRawFd>(fd: F, cmd: u32, arg: FcntlArg) -> io::Result<us
 #[cfg(test)]
 mod tests {
     use super::write;
+    use libc::{GRND_NONBLOCK, GRND_RANDOM, O_CLOEXEC, O_RDWR, O_SYNC, SIGTERM};
+    use std::env;
     use std::ffi::CString;
     use std::fs::{remove_file, File, OpenOptions};
-    use std::io::{self, Seek, SeekFrom, Write};
+    use std::io::{self, Read, Seek, SeekFrom, Write};
     use std::ops::{Deref, DerefMut};
+    use std::os::unix::ffi::OsStrExt;
     use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
     use std::path::{Path, PathBuf};
+    use std::process::Command;
+    use std::sync::atomic::{AtomicU8, Ordering};
     use std::thread::current;
     use std::time::{SystemTime, UNIX_EPOCH};
-
-    use libc::{GRND_NONBLOCK, GRND_RANDOM, O_CLOEXEC, O_RDWR, O_SYNC, SIGTERM};
-    use std::process::Command;
 
     struct TestFile(File, PathBuf);
 
     impl TestFile {
         pub fn new() -> io::Result<Self> {
-            let path = PathBuf::from(&format!("{:?}.testfile", current().id()));
+            static FILES_COUNTER: AtomicU8 = AtomicU8::new(0);
+
+            let curr = FILES_COUNTER.fetch_add(1, Ordering::Relaxed);
+            let path = PathBuf::from(&format!("{:?}{}.testfile", current().id(), curr));
             let file = OpenOptions::new()
                 .write(true)
                 .create(true)
                 .read(true)
                 .open(&path)?;
             Ok(TestFile(file, path))
+        }
+
+        pub fn path(&self) -> &Path {
+            &self.1
         }
     }
 
@@ -259,10 +292,53 @@ mod tests {
         }
     }
 
+    const DUMMY_FD: FileDescriptor = FileDescriptor(0);
+
+    struct FileDescriptor(RawFd);
+    impl AsRawFd for FileDescriptor {
+        fn as_raw_fd(&self) -> RawFd {
+            self.0
+        }
+    }
+
+    #[test]
+    fn test_renameat2() {
+        let one = b"File1";
+        let two = b"File2";
+        let mut file1 = TestFile::new().unwrap();
+        let mut file2 = TestFile::new().unwrap();
+        file1.write_all(one).unwrap();
+        file2.write_all(two).unwrap();
+        let path1 = CString::new(file1.path().as_os_str().as_bytes()).unwrap();
+        let path2 = CString::new(file2.path().as_os_str().as_bytes()).unwrap();
+        let curr_dir = File::open(env::current_dir().unwrap()).unwrap();
+        let res = unsafe {
+            super::renameat2(
+                &curr_dir,
+                &path1,
+                &curr_dir,
+                &path2,
+                Some(super::RenameAt2Flags::ExchangeAtomically),
+            )
+        }
+        .unwrap();
+        assert_eq!(res, 0);
+
+        let mut file1_after = File::open(file1.path()).unwrap();
+        let mut file2_after = File::open(file2.path()).unwrap();
+
+        let mut res = [0u8; 5];
+        file1_after.read_exact(&mut res).unwrap();
+        assert_eq!(res, *two);
+
+        file2_after.read_exact(&mut res).unwrap();
+        assert_eq!(res, *one);
+    }
+
     #[test]
     fn test_kill() {
         let mut child = Command::new("cat").spawn().unwrap();
-        let res = unsafe { super::kill(child.id(), SIGTERM)}.unwrap();
+        let res = unsafe { super::kill(child.id(), SIGTERM) }.unwrap();
         assert_eq!(res, 0);
         let res = child.wait().unwrap().code();
         assert_eq!(res, None);
