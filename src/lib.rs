@@ -11,13 +11,25 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, mem::size_of, ptr};
 
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
-use libc::{flock, timeval, O_CREAT, O_LARGEFILE, O_TMPFILE, RENAME_EXCHANGE, RENAME_NOREPLACE};
+use libc::{
+    flock, timeval, AT_FDCWD, O_CREAT, O_LARGEFILE, O_TMPFILE, RENAME_EXCHANGE, RENAME_NOREPLACE,
+};
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
 static_assert!(size_of::<isize>() >= size_of::<RawFd>());
 static_assert!(size_of::<isize>() >= size_of::<*const ()>());
 static_assert!(size_of::<isize>() >= size_of::<usize>());
+
+// A tool to ease manually making a file descriptor that implements a `AsRawFd`.
+struct FileDescriptor(RawFd);
+impl AsRawFd for FileDescriptor {
+    fn as_raw_fd(&self) -> RawFd {
+        self.0
+    }
+}
+
+const CURRENT_CWD_FD: FileDescriptor = FileDescriptor(AT_FDCWD);
 
 // TODO: Is there any way to make this safe? https://github.com/rust-lang/rfcs/issues/1043#issuecomment-542904091
 // TODO: Read into all ways that writing the a "bad" file descriptor violate rust's safety.
@@ -176,6 +188,11 @@ pub unsafe fn renameat2<F1: AsRawFd, F2: AsRawFd>(
     result!(res)
 }
 
+#[inline]
+pub unsafe fn rename(old_path: &CStr, new_path: &CStr) -> io::Result<usize> {
+    renameat2(&CURRENT_CWD_FD, old_path, &CURRENT_CWD_FD, new_path, None)
+}
+
 pub enum FcntlArg<'a> {
     Flock(&'a mut flock),
     Flags(u32),
@@ -244,27 +261,29 @@ mod tests {
     use std::io::{self, Read, Seek, SeekFrom, Write};
     use std::ops::{Deref, DerefMut};
     use std::os::unix::ffi::OsStrExt;
-    use std::os::unix::io::{AsRawFd, FromRawFd, RawFd};
+    use std::os::unix::io::FromRawFd;
     use std::path::{Path, PathBuf};
     use std::process::Command;
     use std::sync::atomic::{AtomicU8, Ordering};
-    use std::thread::current;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     struct TestFile(File, PathBuf);
 
     impl TestFile {
         pub fn new() -> io::Result<Self> {
-            static FILES_COUNTER: AtomicU8 = AtomicU8::new(0);
-
-            let curr = FILES_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let path = PathBuf::from(&format!("{:?}{}.testfile", current().id(), curr));
+            let path = Self::generate_new_path();
             let file = OpenOptions::new()
                 .write(true)
                 .create(true)
                 .read(true)
                 .open(&path)?;
             Ok(TestFile(file, path))
+        }
+
+        pub fn generate_new_path() -> PathBuf {
+            static FILES_COUNTER: AtomicU8 = AtomicU8::new(0);
+            let curr = FILES_COUNTER.fetch_add(1, Ordering::Relaxed);
+            PathBuf::from(&format!("{}.testfile", curr))
         }
 
         pub fn path(&self) -> &Path {
@@ -292,13 +311,30 @@ mod tests {
         }
     }
 
-    const DUMMY_FD: FileDescriptor = FileDescriptor(0);
+    const DUMMY_FD: super::FileDescriptor = super::FileDescriptor(-1337);
 
-    struct FileDescriptor(RawFd);
-    impl AsRawFd for FileDescriptor {
-        fn as_raw_fd(&self) -> RawFd {
-            self.0
-        }
+    fn path_to_cstr(path: &Path) -> CString {
+        CString::new(path.as_os_str().as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn test_rename() {
+        let mut file1 = TestFile::new().unwrap();
+        let data = b"syscalls are cool";
+        file1.write_all(data).unwrap();
+
+        let f2 = TestFile::generate_new_path();
+        let res =
+            unsafe { super::rename(&path_to_cstr(file1.path()), &path_to_cstr(&f2)) }.unwrap();
+        assert_eq!(res, 0);
+
+        let mut res = [0u8; 17];
+        let mut file2 = File::open(&f2).unwrap();
+        file2.read_exact(&mut res).unwrap();
+
+        assert_eq!(res, *data);
+        drop((file1, file2));
+        remove_file(f2).unwrap();
     }
 
     #[test]
@@ -309,8 +345,8 @@ mod tests {
         let mut file2 = TestFile::new().unwrap();
         file1.write_all(one).unwrap();
         file2.write_all(two).unwrap();
-        let path1 = CString::new(file1.path().as_os_str().as_bytes()).unwrap();
-        let path2 = CString::new(file2.path().as_os_str().as_bytes()).unwrap();
+        let path1 = path_to_cstr(file1.path());
+        let path2 = path_to_cstr(file2.path());
         let curr_dir = File::open(env::current_dir().unwrap()).unwrap();
         let res = unsafe {
             super::renameat2(
@@ -377,11 +413,10 @@ mod tests {
 
     #[test]
     fn test_mkdir_rmdir() {
-        let path = ".testdir";
-        let c_path = CString::new(path).unwrap();
+        let path = TestFile::generate_new_path();
+        let c_path = path_to_cstr(&path);
         let res = unsafe { super::mkdir(&c_path, O_RDWR) }.unwrap();
         assert_eq!(res, 0);
-        let path = Path::new(path);
         assert!(path.exists());
         let res = unsafe { super::rmdir(&c_path) }.unwrap();
         assert_eq!(res, 0);
@@ -404,7 +439,7 @@ mod tests {
     fn test_open() {
         let src = b"Hello World";
         let mut dest = [0u8; 11];
-        let path = CString::new(format!("{:?}.testfile", current().id())).unwrap();
+        let path = path_to_cstr(&TestFile::generate_new_path());
         let mut file = File::create(path.to_str().unwrap()).unwrap();
         file.write_all(src).unwrap();
         drop(file);
@@ -438,14 +473,8 @@ mod tests {
 
     #[test]
     fn test_write_fail() {
-        struct A;
-        impl AsRawFd for A {
-            fn as_raw_fd(&self) -> RawFd {
-                -1
-            }
-        }
         let msg = "Hello World\n";
-        let res = unsafe { write(&mut A, msg.as_bytes()) };
+        let res = unsafe { write(&mut DUMMY_FD, msg.as_bytes()) };
         assert!(res.is_err());
         let err = res.unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::Other);
