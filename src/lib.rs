@@ -282,7 +282,7 @@ pub unsafe fn fcntl<F: AsRawFd>(fd: F, cmd: u32, arg: FcntlArg) -> io::Result<us
 #[cfg(test)]
 mod tests {
     use super::write;
-    use libc::{GRND_NONBLOCK, GRND_RANDOM, O_CLOEXEC, O_RDWR, O_SYNC, SIGTERM};
+    use libc::{O_CLOEXEC, O_RDWR, O_SYNC, SIGTERM};
     use std::env;
     use std::ffi::CString;
     use std::fs::{remove_file, File, OpenOptions};
@@ -439,7 +439,7 @@ mod tests {
     #[test]
     fn test_rand() {
         let mut buf = [0u8; 32];
-        let res = unsafe { super::getrandom(&mut buf, GRND_RANDOM | GRND_NONBLOCK) }.unwrap();
+        let res = unsafe { super::getrandom(&mut buf, None) }.unwrap();
         assert_eq!(res, buf.len());
         assert_ne!(buf, [0u8; 32]);
     }
