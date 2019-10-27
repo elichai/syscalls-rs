@@ -13,6 +13,7 @@ use std::{io, mem::size_of, ptr};
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
 use libc::{
     flock, timeval, AT_FDCWD, O_CREAT, O_LARGEFILE, O_TMPFILE, RENAME_EXCHANGE, RENAME_NOREPLACE,
+    SHUT_RD, SHUT_RDWR, SHUT_WR,
 };
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
@@ -191,6 +192,25 @@ pub unsafe fn renameat2<F1: AsRawFd, F2: AsRawFd>(
 #[inline]
 pub unsafe fn rename(old_path: &CStr, new_path: &CStr) -> io::Result<usize> {
     renameat2(&CURRENT_CWD_FD, old_path, &CURRENT_CWD_FD, new_path, None)
+}
+
+// See: https://doc.rust-lang.org/std/net/enum.Shutdown.html
+pub enum Shutdown {
+    Write = SHUT_WR as isize,
+    Read = SHUT_RD as isize,
+    Both = SHUT_RDWR as isize,
+}
+
+// TODO: Should sockets have a different interface than a file descriptor?
+// TODO: Missing tests.
+#[inline]
+pub unsafe fn shutdown<F: AsRawFd>(socket: &F, how: Shutdown) -> io::Result<usize> {
+    let res = syscall!(
+        Syscalls::Shutdown,
+        socket.as_raw_fd() as isize,
+        how as isize
+    );
+    result!(res)
 }
 
 pub enum FcntlArg<'a> {

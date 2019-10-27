@@ -76,7 +76,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] socketpair
  - [ ] poll
  - [ ] accept
- - [ ] shutdown
+ - [x] shutdown
  - [ ] chdir
  - [ ] getuid
  - [ ] getpid
