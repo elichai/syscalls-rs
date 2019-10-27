@@ -2,7 +2,7 @@
 This library is an attempt to remove the libc dependency from rust with `x86_64-unknown-linux-bare` (and the same for the rest of tier 1 platforms)
 
 
-# Open Questions
+## Open Questions
 1. How much should we aim to make the syscalls "safe"?(i.e. not `unsafe fn`)
 2. Should we provide syscalls only or library functions too? (only 2, or also 3?)
 3. If not then where should (3) be defined/implemented?
@@ -16,8 +16,10 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
 10. Should we split some syscalls into multiple functions? i.e. we could split `fnctl` into a function where the third argument is(`*mut flock`) and one where it's an int(and one without a third argument).
 11. Should we use `bitflags`? https://docs.rs/bitflags
 12. Should we feature gate per linux kernel version? Is there a way to check this at compile/runtime? (for new features).
+13. Should we split the high level syscalls into a files/net etc. modules?.
+14. glibc seems to use `fnctl` for dup*. what should we do?.
 
-# Guidelines (For now - IMHO)
+## Guidelines (For now - IMHO)
 1. This library should only expose syscalls for Linux 3.2+ for now https://github.com/rust-lang/libc/issues/1412#issuecomment-543621431.
 2. If there are advanced functions and subset of those we should expose the most advanced and make a wrapper for the most common one that calls the advanced. (e.g. `rename/renameat/renameat2`).
 3. Try to gain the most safety possible if it's zero cost. if not a case by case consideration is required. (preferably compile time safety).
@@ -65,7 +67,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [x] mkdir
  - [ ] unlink
  - [x] rename
- - [ ] chmod
+ - [x] chmod
  - [x] rmdir
  - [ ] readlink
  - [ ] symlink
@@ -104,6 +106,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] nanosleep
  - [ ] mprotect
  - [ ] accept4
+ - [ ] copy_file_range
 
 
 ### glibc implemented(3)

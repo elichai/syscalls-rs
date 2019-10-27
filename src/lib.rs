@@ -143,7 +143,8 @@ pub fn gettimeofday() -> io::Result<timeval> {
 
 // TODO: There are only 2 falgs. should we just make it an enum?(Open question 5)
 #[inline]
-pub unsafe fn getrandom(buf: &mut [u8], flags: u32) -> io::Result<usize> {
+pub unsafe fn getrandom(buf: &mut [u8], flags: Option<u32>) -> io::Result<usize> {
+    let flags = flags.unwrap_or(0);
     let res = syscall!(
         Syscalls::Getrandom,
         buf.as_mut_ptr() as isize,
@@ -210,6 +211,13 @@ pub unsafe fn shutdown<F: AsRawFd>(socket: &F, how: Shutdown) -> io::Result<usiz
         socket.as_raw_fd() as isize,
         how as isize
     );
+    result!(res)
+}
+
+// TODO: Same question as in `open(2)`. should we just implement `fchmodat(2)` and call that?.
+#[inline]
+pub unsafe fn chmod(path: &CStr, mode: u32) -> io::Result<usize> {
+    let res = syscall!(Syscalls::Chmod, path.as_ptr() as isize, mode as isize,);
     result!(res)
 }
 
@@ -287,23 +295,32 @@ mod tests {
     use std::sync::atomic::{AtomicU8, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    struct TestFile(File, PathBuf);
+    struct TestFile(File, PathBuf, bool);
 
     impl TestFile {
         pub fn new() -> io::Result<Self> {
             let path = Self::generate_new_path();
-            let file = OpenOptions::new()
-                .write(true)
-                .create(true)
-                .read(true)
-                .open(&path)?;
-            Ok(TestFile(file, path))
+            Self::from_path_delete(path, true)
+        }
+
+        pub fn new_dont_delete() -> io::Result<Self> {
+            let path = Self::generate_new_path();
+            Self::from_path_delete(path, false)
         }
 
         pub fn generate_new_path() -> PathBuf {
             static FILES_COUNTER: AtomicU8 = AtomicU8::new(0);
             let curr = FILES_COUNTER.fetch_add(1, Ordering::Relaxed);
             PathBuf::from(&format!("{}.testfile", curr))
+        }
+
+        pub fn from_path_delete(path: PathBuf, delete: bool) -> io::Result<Self> {
+            let file = OpenOptions::new()
+                .write(true)
+                .create(true)
+                .read(true)
+                .open(&path)?;
+            Ok(TestFile(file, path, delete))
         }
 
         pub fn path(&self) -> &Path {
@@ -313,7 +330,9 @@ mod tests {
 
     impl Drop for TestFile {
         fn drop(&mut self) {
-            let _ = remove_file(&self.1);
+            if self.2 {
+                let _ = remove_file(&self.1);
+            }
         }
     }
 
@@ -335,6 +354,23 @@ mod tests {
 
     fn path_to_cstr(path: &Path) -> CString {
         CString::new(path.as_os_str().as_bytes()).unwrap()
+    }
+
+    #[test]
+    fn test_chmod() {
+        let mut file = TestFile::new_dont_delete().unwrap();
+        let data = b"syscalls are cool";
+        file.write_all(data).unwrap();
+        let p_path = file.path().to_owned();
+        let path = path_to_cstr(&p_path);
+        drop(file);
+        let res = unsafe { super::chmod(&path, 0o000) }.unwrap();
+        assert_eq!(res, 0);
+        let err = unsafe { super::open(&path, O_CLOEXEC | O_SYNC | O_RDWR, None) }.unwrap_err();
+        assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
+        assert_eq!(err.to_string(), "Permission denied (os error 13)");
+
+        remove_file(&p_path).unwrap();
     }
 
     #[test]
