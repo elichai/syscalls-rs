@@ -72,7 +72,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] readlink
  - [ ] symlink
  - [ ] link
- - [ ] syscall
+ - [ ] ~~syscall~~ (We really shouldn't provide this)
  - [ ] signal
  - [c] socket
  - [ ] socketpair
