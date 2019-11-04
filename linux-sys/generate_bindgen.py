@@ -13,7 +13,7 @@ BINDGEN_FLAGS = "--default-enum-style=rust --rust-target=nightly --use-array-poi
 CLANG_FLAGS = "-nostdinc"
 
 
-headers_list = ["fcntl", "time"]
+headers_list = ["fcntl", "time", "fs"]
 
 
 def call(command, cwd=None):
