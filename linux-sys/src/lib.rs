@@ -1,6 +1,3 @@
-mod generic;
-
-
 
 #[cfg(target_arch = "arm")]
 mod arm;

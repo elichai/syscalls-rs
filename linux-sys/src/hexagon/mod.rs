@@ -1,1 +1,2 @@
-pub use crate::generic::fcntl;
+pub mod fcntl;
+pub mod time;
