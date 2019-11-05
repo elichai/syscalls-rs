@@ -51,19 +51,18 @@ fn socket_addr(addr: SocketAddr) -> (*const sockaddr, socklen_t) {
 
 #[derive(Clone, Copy, Debug)]
 #[repr(i32)]
-pub enum SocketType {
+pub enum SockType {
     Stream = SOCK_STREAM,
-    Dgram = SOCK_DGRAM,
+    Datagram = SOCK_DGRAM,
     SeqPacket = SOCK_SEQPACKET,
     Raw = SOCK_RAW,
     Rdm = SOCK_RDM,
-    // SOCK_PACKET is obsolete
 }
 
 #[derive(Clone, Copy)]
-pub struct SocketFlags(i32);
+pub struct SockFlags(i32);
 
-impl SocketFlags {
+impl SockFlags {
     pub fn new() -> Self {
         Self(0)
     }
@@ -80,7 +79,7 @@ impl SocketFlags {
 }
 
 #[inline]
-pub fn socket(addr: SocketAddr, sock: SocketType, flags: SocketFlags) -> io::Result<Fd> {
+pub fn socket(addr: SocketAddr, sock: SockType, flags: SockFlags) -> io::Result<Fd> {
     // flags only supported by kernel >= 2.6.27
     let domain = match addr {
         SocketAddr::V4(_) => AF_INET,
@@ -225,8 +224,8 @@ mod tests {
     #[test]
     fn test_socket_ip4_no_flags() {
         let ip4 = "127.0.0.1:0".parse().unwrap();
-        let fd1 = socket(ip4, SocketType::Dgram, SocketFlags::new()).unwrap();
-        let fd2 = socket(ip4, SocketType::Dgram, SocketFlags::new()).unwrap();
+        let fd1 = socket(ip4, SockType::Datagram, SockFlags::new()).unwrap();
+        let fd2 = socket(ip4, SockType::Datagram, SockFlags::new()).unwrap();
         bind(&fd1, ip4).unwrap();
         bind(&fd2, ip4).unwrap();
         let addr1 = getsockname(&fd1).unwrap();
@@ -243,9 +242,9 @@ mod tests {
     #[ignore]
     fn test_socket_ip6_with_flags() {
         let ip6 = "[::1]:0".parse().unwrap();
-        let flags = SocketFlags::new().cloexec().nonblock();
-        let fd1 = socket(ip6, SocketType::Dgram, flags).unwrap();
-        let fd2 = socket(ip6, SocketType::Dgram, flags).unwrap();
+        let flags = SockFlags::new().cloexec().nonblock();
+        let fd1 = socket(ip6, SockType::Datagram, flags).unwrap();
+        let fd2 = socket(ip6, SockType::Datagram, flags).unwrap();
         bind(&fd1, ip6).unwrap();
         bind(&fd2, ip6).unwrap();
         let addr1 = getsockname(&fd1).unwrap();
