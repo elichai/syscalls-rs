@@ -217,6 +217,59 @@ pub fn recvmsg<F: AsRawFd>(
     Ok((n, address))
 }
 
+#[derive(Clone, Copy, Debug)]
+#[repr(i32)]
+pub enum SockOptLevel {
+    Socket = libc::SOL_SOCKET,
+    Ip4 = libc::SOL_IP,
+    Ip6 = libc::SOL_IPV6,
+    Udp = libc::SOL_UDP,
+    Tcp = libc::SOL_TCP,
+    Icmp6 = libc::SOL_ICMPV6,
+}
+
+#[inline]
+pub fn getsockopt<F: AsRawFd, T>(
+    socket: F,
+    level: SockOptLevel,
+    name: i32,
+    val: &mut T,
+) -> io::Result<()> {
+    let mut len = mem::size_of_val(val);
+    let res = unsafe {
+        syscall!(
+            Syscalls::Getsockopt,
+            socket.as_raw_fd() as isize,
+            level as i32 as isize,
+            name as isize,
+            val as *mut _ as isize,
+            &mut len as *mut _ as isize,
+        )
+    };
+    result!(res).map(|_| ())
+}
+
+#[inline]
+pub fn setsockopt<F: AsRawFd, T: core::fmt::Debug>(
+    socket: F,
+    level: SockOptLevel,
+    name: i32,
+    val: &T,
+) -> io::Result<()> {
+    let len = mem::size_of_val(val) as libc::socklen_t;
+    let res = unsafe {
+        syscall!(
+            Syscalls::Setsockopt,
+            socket.as_raw_fd() as isize,
+            level as i32 as isize,
+            name as isize,
+            val as *const _ as isize,
+            len as isize,
+        )
+    };
+    result!(res).map(|_| ())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -255,5 +308,28 @@ mod tests {
         let (len, addr) = recvmsg(&fd2, &mut buf, 0).unwrap();
         assert_eq!(addr, addr1);
         assert_eq!(buf[..len], b"hello"[..]);
+    }
+
+    #[test]
+    fn test_opts_ip4() {
+        let ip4 = "127.0.0.1:0".parse().unwrap();
+        let fd1 = socket(ip4, SockType::Datagram, SockFlags::new()).unwrap();
+        let on: libc::c_int = 1;
+        setsockopt(&fd1, SockOptLevel::Ip4, libc::IP_RECVTOS, &on).unwrap();
+        let mut on: libc::c_int = 0;
+        getsockopt(&fd1, SockOptLevel::Ip4, libc::IP_RECVTOS, &mut on).unwrap();
+        assert_eq!(on, 1);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_opts_ip6() {
+        let ip6 = "[::1]:0".parse().unwrap();
+        let fd1 = socket(ip6, SockType::Datagram, SockFlags::new()).unwrap();
+        let on: libc::c_int = 1;
+        setsockopt(&fd1, SockOptLevel::Ip6, libc::IPV6_RECVTCLASS, &on).unwrap();
+        let mut on: libc::c_int = 0;
+        getsockopt(&fd1, SockOptLevel::Ip6, libc::IPV6_RECVTCLASS, &mut on).unwrap();
+        assert_eq!(on, 1);
     }
 }
