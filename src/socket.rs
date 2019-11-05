@@ -240,6 +240,7 @@ mod tests {
     }
 
     #[test]
+    #[ignore]
     fn test_socket_ip6_with_flags() {
         let ip6 = "[::1]:0".parse().unwrap();
         let flags = SocketFlags::new().cloexec().nonblock();
