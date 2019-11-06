@@ -60,6 +60,8 @@ def main():
     generate_headers()
     print("Generating rust bindings")
     generate_bindings()
+    # Script that adds the new module to the build system:
+    # `find . -type f -iname mod.rs -exec bash -c 'echo -e "mod fs\n;" >> "{}"' \;`
 
 
 if __name__ == "__main__":
