@@ -9,6 +9,9 @@ rust:
 script:
   - cargo build --verbose
   - cargo test --verbose
+  - cd linux-sys
+  - cargo build --verbose
+  - cargo test --verbose
 
 notifications:
   email:
