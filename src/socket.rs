@@ -367,14 +367,191 @@ pub fn getsockname<F: AsRawFd>(socket: F) -> io::Result<SockAddr> {
 }
 
 #[inline]
+pub fn getpeername<F: AsRawFd>(socket: F) -> io::Result<SockAddr> {
+    let mut address = MaybeUninit::<libc::sockaddr_storage>::uninit();
+    let mut address_len = mem::size_of::<libc::sockaddr_storage>();
+    let res = unsafe {
+        syscall!(
+            Syscalls::Getpeername,
+            socket.as_raw_fd() as isize,
+            address.as_mut_ptr() as isize,
+            &mut address_len as *mut _ as isize,
+        )
+    };
+    let address = unsafe { address.assume_init() };
+    result!(res).map(|_| SockAddr::from_ffi(&address))
+}
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+pub struct MsgFlags(isize);
+
+impl MsgFlags {
+    /// Creates new `MsgFlags`.
+    pub fn new() -> Self {
+        Self(0)
+    }
+
+    /// MSG_CONFIRM (Since Linux 2.3.15)
+    /// Tell the link layer that forward progress happened: you got a
+    /// successful reply from the other side. If the link layer doesn't get
+    /// this it will regularly reprobe the neighbor (e.g., via a unicast ARP).
+    /// Only valid on SOCK_DGRAM and SOCK_RAW sockets and currently only
+    /// implemented for IPv4 and IPv6. See arp(7) for details.
+    pub fn confirm(mut self) -> Self {
+        self.0 |= libc::MSG_CONFIRM as isize;
+        self
+    }
+
+    /// MSG_DONTROUTE
+    /// Don't use a gateway to send out the packet, only send to hosts on
+    /// directly connected networks. This is usually used only by diagnostic or
+    /// routing programs. This is only defined for protocol families that route;
+    /// packet sockets don't.
+    pub fn dont_route(mut self) -> Self {
+        self.0 |= libc::MSG_DONTROUTE as isize;
+        self
+    }
+
+    /// MSG_DONTWAIT (since Linux 2.2)
+    /// Enables nonblocking operation; if the operation would block, EAGAIN or
+    /// EWOULDBLOCK is returned (this can also be enabled using the O_NONBLOCK
+    /// flag with the F_SETFL fcntl(2)).
+    pub fn dont_wait(mut self) -> Self {
+        self.0 |= libc::MSG_DONTWAIT as isize;
+        self
+    }
+
+    /// MSG_EOR (since Linux 2.2)
+    /// Terminates a record (when this notion is supported, as for sockets of
+    /// type SOCK_SEQPACKET).
+    pub fn eor(mut self) -> Self {
+        self.0 |= libc::MSG_EOR as isize;
+        self
+    }
+
+    /// MSG_MORE (Since Linux 2.4.4)
+    /// The caller has more data to send. This flag is used with TCP sockets to
+    /// obtain the same effect as the TCP_CORK socket option (see tcp(7)), with
+    /// the difference that this flag can be set on a per-call basis.
+    /// Since Linux 2.6, this flag is also supported for UDP sockets, and
+    /// informs the kernel to package all of the data sent in calls with this
+    /// flag set into a single datagram which is only transmitted when a call
+    /// is performed that does not specify this flag. (See also the UDP_CORK
+    /// socket option described in udp(7).)
+    pub fn more(mut self) -> Self {
+        self.0 |= libc::MSG_MORE as isize;
+        self
+    }
+
+    /// MSG_NOSIGNAL (since Linux 2.2)
+    /// Requests not to send SIGPIPE on errors on stream oriented sockets when
+    /// the other end breaks the connection. The EPIPE error is still returned.
+    pub fn no_signal(mut self) -> Self {
+        self.0 |= libc::MSG_NOSIGNAL as isize;
+        self
+    }
+
+    /// MSG_OOB
+    /// Sends out-of-band data on sockets that support this notion (e.g., of
+    /// type SOCK_STREAM); the underlying protocol must also support out-of-band
+    /// data.
+    pub fn oob(mut self) -> Self {
+        self.0 |= libc::MSG_OOB as isize;
+        self
+    }
+
+    /// MSG_CMSG_CLOEXEC (recvmsg() only; since Linux 2.6.23)
+    /// Set the close-on-exec flag for the file descriptor received via a UNIX
+    /// domain file descriptor using the SCM_RIGHTS operation (described in unix(7)).
+    /// This flag is useful for the same reasons as the O_CLOEXEC flag of open(2).
+    pub fn cmsg_cloexec(mut self) -> Self {
+        self.0 |= libc::MSG_CMSG_CLOEXEC as isize;
+        self
+    }
+
+    /// MSG_ERRQUEUE (since Linux 2.2)
+    /// This flag specifies that queued errors should be received from the
+    /// socket error queue. The error is passed in an ancillary message with a
+    /// type dependent on the protocol (for IPv4 IP_RECVERR). The user should
+    /// supply a buffer of sufficient size. See cmsg(3) and ip(7) for more
+    /// information. The payload of the original packet that caused the error
+    /// is passed as normal data via msg_iovec. The original destination address
+    /// of the datagram that caused the error is supplied via msg_name.
+    /// For local errors, no address is passed (this can be checked with the
+    /// cmsg_len member of the cmsghdr). For error receives, the MSG_ERRQUEUE
+    /// is set in the msghdr. After an error has been passed, the pending
+    /// socket error is regenerated based on the next queued error and will be
+    /// passed on the next socket operation.
+    pub fn err_queue(mut self) -> Self {
+        self.0 |= libc::MSG_ERRQUEUE as isize;
+        self
+    }
+
+    /// MSG_PEEK
+    /// This flag causes the receive operation to return data from the beginning
+    /// of the receive queue without removing that data from the queue. Thus, a
+    /// subsequent receive call will return the same data.
+    pub fn peek(mut self) -> Self {
+        self.0 |= libc::MSG_PEEK as isize;
+        self
+    }
+
+    /// MSG_TRUNC (since Linux 2.2)
+    /// For raw (AF_PACKET), Internet datagram (since Linux 2.4.27/2.6.8),
+    /// netlink (since Linux 2.6.22) and UNIX datagram (since Linux 3.4)
+    /// sockets: return the real length of the packet or datagram, even when it
+    /// was longer than the passed buffer. Not implemented for UNIX domain
+    /// (unix(7)) sockets. For use with Internet stream sockets, see tcp(7).
+    pub fn trunc(mut self) -> Self {
+        self.0 |= libc::MSG_TRUNC as isize;
+        self
+    }
+
+    /// MSG_WAITALL (since Linux 2.2)
+    /// This flag requests that the operation block until the full request is
+    /// satisfied. However, the call may still return less data than requested
+    /// if a signal is caught, an error or disconnect occurs, or the next data
+    /// to be received is of a different type than that returned.
+    pub fn wait_all(mut self) -> Self {
+        self.0 |= libc::MSG_WAITALL as isize;
+        self
+    }
+}
+
+impl core::fmt::Debug for MsgFlags {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.debug_struct("MsgFlags")
+            .field("CONFIRM", &(self.0 & libc::MSG_CONFIRM as isize > 0))
+            .field("DONTROUTE", &(self.0 & libc::MSG_DONTROUTE as isize > 0))
+            .field("DONTWAIT", &(self.0 & libc::MSG_DONTWAIT as isize > 0))
+            .field("EOR", &(self.0 & libc::MSG_EOR as isize > 0))
+            .field("MORE", &(self.0 & libc::MSG_MORE as isize > 0))
+            .field("NOSIGNAL", &(self.0 & libc::MSG_NOSIGNAL as isize > 0))
+            .field("OOB", &(self.0 & libc::MSG_OOB as isize > 0))
+            .field(
+                "CMSG_CLOEXEC",
+                &(self.0 & libc::MSG_CMSG_CLOEXEC as isize > 0),
+            )
+            .field("ERRQUEUE", &(self.0 & libc::MSG_ERRQUEUE as isize > 0))
+            .field("PEEK", &(self.0 & libc::MSG_PEEK as isize > 0))
+            .field("TRUNC", &(self.0 & libc::MSG_TRUNC as isize > 0))
+            .field("WAITALL", &(self.0 & libc::MSG_WAITALL as isize > 0))
+            .finish()
+    }
+}
+
+pub struct ControlMessage;
+
+#[inline]
 pub fn sendmsg<F: AsRawFd>(
     socket: F,
-    addr: SockAddr,
-    //ctrl: MsgCtrl,
+    addr: Option<SockAddr>,
     msg: &[u8],
-    flags: u32,
+    _cmsgs: &[ControlMessage],
+    flags: MsgFlags,
 ) -> io::Result<usize> {
-    let (name, namelen) = addr.as_ffi();
+    let (name, namelen) = addr.map(|addr| addr.as_ffi()).unwrap_or((ptr::null(), 0));
+
     let mut iov = libc::iovec {
         iov_base: msg.as_ptr() as *const _ as *mut _,
         iov_len: msg.len(),
@@ -394,7 +571,7 @@ pub fn sendmsg<F: AsRawFd>(
                 Syscalls::Sendmsg,
                 socket.as_raw_fd() as isize,
                 &hdr as *const _ as isize,
-                flags as isize
+                flags.0,
             )
         };
         return match result!(res) {
@@ -409,7 +586,7 @@ pub fn sendmsg<F: AsRawFd>(
 pub fn recvmsg<F: AsRawFd>(
     socket: F,
     buf: &mut [u8],
-    flags: u32,
+    flags: MsgFlags,
 ) -> io::Result<(usize, SockAddr /*, MsgCtrl*/)> {
     let mut address = MaybeUninit::<libc::sockaddr_storage>::uninit();
     let address_len = mem::size_of_val(&address);
@@ -432,7 +609,7 @@ pub fn recvmsg<F: AsRawFd>(
                 Syscalls::Recvmsg,
                 socket.as_raw_fd() as isize,
                 &mut hdr as *mut _ as isize,
-                flags as isize,
+                flags.0,
             )
         };
         match result!(res) {
@@ -504,7 +681,8 @@ mod tests {
 
     #[test]
     fn test_socket_ip4_no_flags() {
-        let ip4: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let addr1: SocketAddr = "127.0.0.1:59999".parse().unwrap();
+        let addr2: SocketAddr = "127.0.0.1:0".parse().unwrap();
         let fd1 = socket(
             AddressFamily::Inet,
             SockType::Datagram,
@@ -543,9 +721,9 @@ mod tests {
         let addr1 = getsockname(&fd1).unwrap();
         let addr2 = getsockname(&fd2).unwrap();
         println!("{:?} {:?}", addr1, addr2);
-        sendmsg(&fd1, addr2, b"hello", 0).unwrap();
+        sendmsg(&fd1, Some(addr2), b"hello", &[], MsgFlags::new()).unwrap();
         let mut buf = [0u8; 10];
-        let (len, addr) = recvmsg(&fd2, &mut buf, 0).unwrap();
+        let (len, addr) = recvmsg(&fd2, &mut buf, MsgFlags::new()).unwrap();
         assert_eq!(addr, addr1);
         assert_eq!(buf[..len], b"hello"[..]);
     }
