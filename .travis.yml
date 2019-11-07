@@ -1,8 +1,13 @@
 language: rust
-sudo: false
 cache: false
-os:
-  - linux
+matrix:
+  include:
+  - os: linux
+    arch: amd64
+  - os: linux
+    arch: arm64
+  - os: linux-ppc64le
+
 rust:
   - nightly
 
