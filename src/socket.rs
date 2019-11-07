@@ -13,7 +13,7 @@ use std::os::unix::{
     ffi::OsStrExt,
     io::{AsRawFd, RawFd},
 };
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub struct Fd(usize);
 
@@ -322,23 +322,41 @@ impl TryFrom<&Path> for SockAddr {
     }
 }
 
-impl TryFrom<SocketAddr> for SockAddr {
+impl TryFrom<SockAddr> for PathBuf {
     type Error = io::Error;
 
-    fn try_from(addr: SocketAddr) -> Result<Self, Self::Error> {
-        Ok(match addr {
+    fn try_from(addr: SockAddr) -> Result<Self, Self::Error> {
+        match addr {
+            SockAddr::Unix(addr) => Ok(addr.as_path().into()),
+            _ => Err(io::Error::new(io::ErrorKind::Other, "inet address is not convertible to unix address")),
+        }
+    }
+}
+
+impl From<SocketAddr> for SockAddr {
+    fn from(addr: SocketAddr) -> Self {
+        match addr {
             SocketAddr::V4(addr) => SockAddr::Inet(SockAddrInet::from(addr)),
             SocketAddr::V6(addr) => SockAddr::Inet6(SockAddrInet6::from(addr)),
-        })
+        }
+    }
+}
+
+impl TryFrom<SockAddr> for SocketAddr {
+    type Error = io::Error;
+
+    fn try_from(addr: SockAddr) -> Result<Self, Self::Error> {
+        match addr {
+            SockAddr::Inet(addr) => Ok(SocketAddr::V4(addr.to_addr())),
+            SockAddr::Inet6(addr) => Ok(SocketAddr::V6(addr.to_addr())),
+            _ => Err(io::Error::new(io::ErrorKind::Other, "unix address is not convertible to inet address"))
+        }
     }
 }
 
 #[inline]
-pub fn bind<F: AsRawFd, A: TryInto<SockAddr, Error = io::Error>>(
-    socket: F,
-    addr: A,
-) -> io::Result<()> {
-    let (addr, addr_len) = addr.try_into()?.as_ffi();
+pub fn bind<F: AsRawFd>(socket: F, addr: SockAddr) -> io::Result<()> {
+    let (addr, addr_len) = addr.as_ffi();
     let res = unsafe {
         syscall!(
             Syscalls::Bind,
@@ -697,15 +715,14 @@ mod tests {
             None,
         )
         .unwrap();
-        bind(&fd1, ip4).unwrap();
-        bind(&fd2, ip4).unwrap();
-        let addr1 = getsockname(&fd1).unwrap();
+        bind(&fd1, addr1.into()).unwrap();
+        bind(&fd2, addr2.into()).unwrap();
         let addr2 = getsockname(&fd2).unwrap();
         println!("{:?} {:?}", addr1, addr2);
-        sendmsg(&fd1, addr2, b"hello", 0).unwrap();
+        sendmsg(&fd1, Some(addr2), b"hello", &[], MsgFlags::new()).unwrap();
         let mut buf = [0u8; 10];
-        let (len, addr) = recvmsg(&fd2, &mut buf, 0).unwrap();
-        assert_eq!(addr, addr1);
+        let (len, addr) = recvmsg(&fd2, &mut buf, MsgFlags::new()).unwrap();
+        assert_eq!(addr, SockAddr::try_from(addr1).unwrap());
         assert_eq!(buf[..len], b"hello"[..]);
     }
 
@@ -716,8 +733,8 @@ mod tests {
         let flags = SockFlags::new().cloexec().nonblock();
         let fd1 = socket(AddressFamily::Inet6, SockType::Datagram, flags, None).unwrap();
         let fd2 = socket(AddressFamily::Inet6, SockType::Datagram, flags, None).unwrap();
-        bind(&fd1, ip6).unwrap();
-        bind(&fd2, ip6).unwrap();
+        bind(&fd1, ip6.into()).unwrap();
+        bind(&fd2, ip6.into()).unwrap();
         let addr1 = getsockname(&fd1).unwrap();
         let addr2 = getsockname(&fd2).unwrap();
         println!("{:?} {:?}", addr1, addr2);
