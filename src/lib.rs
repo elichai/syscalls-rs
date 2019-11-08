@@ -2,6 +2,7 @@
 #![allow(clippy::missing_safety_doc)]
 
 mod arch;
+mod cmsg;
 mod socket;
 pub(crate) mod utils;
 
