@@ -1,4 +1,6 @@
 **/target
 **/*.rs.bk
-Cargo.lock
-.idea
+**/Cargo.lock
+**/.idea
+linux-sys/src/*
+!linux-sys/src/lib.rs
