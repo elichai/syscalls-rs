@@ -14,6 +14,9 @@ fn main() {
             })
             .rust_target(RustTarget::Nightly)
             .array_pointers_in_arguments(true)
+            .derive_copy(true)
+            .derive_debug(true)
+            .derive_default(true)
             .clang_arg("-nostdinc")
             .clang_arg(&format!("-I{}/include", path))
             .header(format!("{}/include/linux/{}.h", path, file))
@@ -29,7 +32,7 @@ fn unrecognized_arch() -> ! {
     if env::var("CARGO_CFG_TARGET_FAMILY").unwrap() == "unix" {
         let target = env::var("TARGET").unwrap();
         panic!(
-            "unix target isn't recognize: {} target, please report to: {}",
+            "unix target isn't recognize: {}, please report to: {}",
             target, ISSUE
         );
     } else {
