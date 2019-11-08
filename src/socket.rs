@@ -413,9 +413,9 @@ pub trait SockOpt {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Ip4Recvtos(libc::c_int);
+pub struct Ip4RecvTos(libc::c_int);
 
-impl Ip4Recvtos {
+impl Ip4RecvTos {
     pub fn new(b: bool) -> Self {
         Self(if b { 1 } else { 0 })
     }
@@ -425,7 +425,7 @@ impl Ip4Recvtos {
     }
 }
 
-impl SockOpt for Ip4Recvtos {
+impl SockOpt for Ip4RecvTos {
     fn level(&self) -> SockOptLevel {
         SockOptLevel::Ip4
     }
@@ -444,9 +444,9 @@ impl SockOpt for Ip4Recvtos {
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Ip6Recvtclass(libc::c_int);
+pub struct Ip6RecvTclass(libc::c_int);
 
-impl Ip6Recvtclass {
+impl Ip6RecvTclass {
     pub fn new(b: bool) -> Self {
         Self(if b { 1 } else { 0 })
     }
@@ -456,7 +456,7 @@ impl Ip6Recvtclass {
     }
 }
 
-impl SockOpt for Ip6Recvtclass {
+impl SockOpt for Ip6RecvTclass {
     fn level(&self) -> SockOptLevel {
         SockOptLevel::Ip6
     }
@@ -915,10 +915,10 @@ mod tests {
     #[test]
     fn test_ip4_recvtos_option() {
         let (s1, s2) = socket_pair(AddressFamily::Inet, SockType::Datagram);
-        setsockopt(&s1, Ip4Recvtos::new(true)).unwrap();
-        setsockopt(&s2, Ip4Recvtos::new(true)).unwrap();
+        setsockopt(&s1, Ip4RecvTos::new(true)).unwrap();
+        setsockopt(&s2, Ip4RecvTos::new(true)).unwrap();
 
-        let tos = getsockopt::<_, Ip4Recvtos>(&s1).unwrap();
+        let tos = getsockopt::<_, Ip4RecvTos>(&s1).unwrap();
         assert_eq!(tos.value(), true);
         sendmsg(
             &s1,
@@ -941,10 +941,10 @@ mod tests {
     #[ignore]
     fn test_ip6_recvtclass_option() {
         let (s1, s2) = socket_pair(AddressFamily::Inet6, SockType::Datagram);
-        setsockopt(&s1, Ip6Recvtclass::new(true)).unwrap();
-        setsockopt(&s2, Ip6Recvtclass::new(true)).unwrap();
+        setsockopt(&s1, Ip6RecvTclass::new(true)).unwrap();
+        setsockopt(&s2, Ip6RecvTclass::new(true)).unwrap();
 
-        let tclass = getsockopt::<_, Ip6Recvtclass>(&s1).unwrap();
+        let tclass = getsockopt::<_, Ip6RecvTclass>(&s1).unwrap();
         assert_eq!(tclass.value(), true);
         sendmsg(
             &s1,
