@@ -1,4 +1,5 @@
 use crate::arch::Syscalls;
+use crate::socket::cmsg;
 use crate::{result, syscall};
 use core::convert::{TryFrom, TryInto};
 use core::{
@@ -172,7 +173,8 @@ impl SockAddrInet {
     fn to_addr(&self) -> SocketAddrV4 {
         let addr = self.0.sin_addr.s_addr.to_ne_bytes();
         let ip = Ipv4Addr::from(addr);
-        SocketAddrV4::new(ip, self.0.sin_port)
+        let port = u16::from_be_bytes(self.0.sin_port.to_ne_bytes());
+        SocketAddrV4::new(ip, port)
     }
 }
 
@@ -194,7 +196,7 @@ impl From<SocketAddrV4> for SockAddrInet {
     fn from(addr: SocketAddrV4) -> Self {
         let addr = libc::sockaddr_in {
             sin_family: libc::AF_INET as libc::sa_family_t,
-            sin_port: addr.port() as libc::in_port_t,
+            sin_port: addr.port().to_be() as libc::in_port_t,
             sin_addr: libc::in_addr {
                 s_addr: u32::from_ne_bytes(addr.ip().octets()),
             },
@@ -211,12 +213,8 @@ impl SockAddrInet6 {
     fn to_addr(&self) -> SocketAddrV6 {
         let addr = self.0.sin6_addr.s6_addr;
         let ip = Ipv6Addr::from(addr);
-        SocketAddrV6::new(
-            ip,
-            self.0.sin6_port,
-            self.0.sin6_flowinfo,
-            self.0.sin6_scope_id,
-        )
+        let port = u16::from_be_bytes(self.0.sin6_port.to_ne_bytes());
+        SocketAddrV6::new(ip, port, self.0.sin6_flowinfo, self.0.sin6_scope_id)
     }
 }
 
@@ -238,7 +236,7 @@ impl From<SocketAddrV6> for SockAddrInet6 {
     fn from(addr: SocketAddrV6) -> Self {
         Self(libc::sockaddr_in6 {
             sin6_family: libc::AF_INET6 as libc::sa_family_t,
-            sin6_port: addr.port() as libc::in_port_t,
+            sin6_port: addr.port().to_be() as libc::in_port_t,
             sin6_addr: libc::in6_addr {
                 s6_addr: addr.ip().octets(),
             },
@@ -334,6 +332,34 @@ impl From<SocketAddr> for SockAddr {
     }
 }
 
+impl TryFrom<SockAddr> for SocketAddrV4 {
+    type Error = io::Error;
+
+    fn try_from(addr: SockAddr) -> Result<Self, Self::Error> {
+        match addr {
+            SockAddr::Inet(addr) => Ok(addr.to_addr()),
+            _ => Err(io::Error::new(
+                io::ErrorKind::Other,
+                "unix address is not convertible to ip4 address",
+            )),
+        }
+    }
+}
+
+impl TryFrom<SockAddr> for SocketAddrV6 {
+    type Error = io::Error;
+
+    fn try_from(addr: SockAddr) -> Result<Self, Self::Error> {
+        match addr {
+            SockAddr::Inet6(addr) => Ok(addr.to_addr()),
+            _ => Err(io::Error::new(
+                io::ErrorKind::Other,
+                "unix address is not convertible to ip4 address",
+            )),
+        }
+    }
+}
+
 impl TryFrom<SockAddr> for SocketAddr {
     type Error = io::Error;
 
@@ -410,68 +436,6 @@ pub trait SockOpt {
     fn name(&self) -> isize;
     fn as_ffi(&self) -> &libc::c_int;
     fn as_ffi_mut(&mut self) -> &mut libc::c_int;
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Ip4RecvTos(libc::c_int);
-
-impl Ip4RecvTos {
-    pub fn new(b: bool) -> Self {
-        Self(if b { 1 } else { 0 })
-    }
-
-    pub fn value(&self) -> bool {
-        self.0 > 0
-    }
-}
-
-impl SockOpt for Ip4RecvTos {
-    fn level(&self) -> SockOptLevel {
-        SockOptLevel::Ip4
-    }
-
-    fn name(&self) -> isize {
-        libc::IP_RECVTOS as isize
-    }
-
-    fn as_ffi(&self) -> &libc::c_int {
-        &self.0
-    }
-
-    fn as_ffi_mut(&mut self) -> &mut libc::c_int {
-        &mut self.0
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Ip6RecvTclass(libc::c_int);
-
-impl Ip6RecvTclass {
-    pub fn new(b: bool) -> Self {
-        Self(if b { 1 } else { 0 })
-    }
-
-    pub fn value(&self) -> bool {
-        self.0 > 0
-    }
-}
-
-impl SockOpt for Ip6RecvTclass {
-    fn level(&self) -> SockOptLevel {
-        SockOptLevel::Ip6
-    }
-
-    fn name(&self) -> isize {
-        libc::IPV6_RECVTCLASS as isize
-    }
-
-    fn as_ffi(&self) -> &libc::c_int {
-        &self.0
-    }
-
-    fn as_ffi_mut(&mut self) -> &mut libc::c_int {
-        &mut self.0
-    }
 }
 
 #[inline]
@@ -669,68 +633,6 @@ impl core::fmt::Debug for MsgFlags {
     }
 }
 
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Ip4Tos(libc::c_int);
-
-impl Ip4Tos {
-    pub fn new(value: u8) -> Self {
-        Self(value as libc::c_int)
-    }
-
-    pub fn value(&self) -> u8 {
-        self.0 as u8
-    }
-}
-
-impl SockOpt for Ip4Tos {
-    fn level(&self) -> SockOptLevel {
-        SockOptLevel::Ip4
-    }
-
-    fn name(&self) -> isize {
-        libc::IP_TOS as isize
-    }
-
-    fn as_ffi(&self) -> &libc::c_int {
-        &self.0
-    }
-
-    fn as_ffi_mut(&mut self) -> &mut libc::c_int {
-        &mut self.0
-    }
-}
-
-#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
-pub struct Ip6Tclass(libc::c_int);
-
-impl Ip6Tclass {
-    pub fn new(value: u8) -> Self {
-        Self(value as libc::c_int)
-    }
-
-    pub fn value(&self) -> u8 {
-        self.0 as u8
-    }
-}
-
-impl SockOpt for Ip6Tclass {
-    fn level(&self) -> SockOptLevel {
-        SockOptLevel::Ip6
-    }
-
-    fn name(&self) -> isize {
-        libc::IPV6_TCLASS as isize
-    }
-
-    fn as_ffi(&self) -> &libc::c_int {
-        &self.0
-    }
-
-    fn as_ffi_mut(&mut self) -> &mut libc::c_int {
-        &mut self.0
-    }
-}
-
 #[inline]
 pub fn sendmsg<F: AsRawFd>(
     socket: F,
@@ -744,7 +646,7 @@ pub fn sendmsg<F: AsRawFd>(
         iov_base: msg.as_ptr() as *const _ as *mut _,
         iov_len: msg.len(),
     };
-    let mut ctrl = crate::cmsg::Aligned(MaybeUninit::<[u8; 255]>::uninit());
+    let mut ctrl = cmsg::Aligned(MaybeUninit::<[u8; 255]>::uninit());
     let mut hdr = libc::msghdr {
         msg_name: name as _,
         msg_namelen: namelen as _,
@@ -754,7 +656,7 @@ pub fn sendmsg<F: AsRawFd>(
         msg_controllen: 255,
         msg_flags: 0,
     };
-    let mut encoder = unsafe { crate::cmsg::Encoder::new(&mut hdr) };
+    let mut encoder = unsafe { cmsg::Encoder::new(&mut hdr) };
     for cmsg in cmsgs {
         encoder.push(cmsg.level() as i32, cmsg.name() as i32, *cmsg.as_ffi());
     }
@@ -789,7 +691,7 @@ pub fn recvmsg<F: AsRawFd>(
         iov_base: buf.as_mut_ptr() as *mut _,
         iov_len: buf.len(),
     };
-    let mut ctrl = crate::cmsg::Aligned(MaybeUninit::<[u8; 255]>::uninit());
+    let mut ctrl = cmsg::Aligned(MaybeUninit::<[u8; 255]>::uninit());
     let mut hdr = libc::msghdr {
         msg_name: address.as_mut_ptr() as *mut _,
         msg_namelen: address_len as _,
@@ -816,25 +718,34 @@ pub fn recvmsg<F: AsRawFd>(
     };
     let address = unsafe { address.assume_init() };
     let address = SockAddr::from_ffi(&address);
-    for cmsg in unsafe { crate::cmsg::Iter::new(&hdr) } {
+    for cmsg in unsafe { cmsg::Iter::new(&hdr) } {
         if let Some(dst) = cbuf
             .iter_mut()
             .find(|c| c.level() as i32 == cmsg.cmsg_level && c.name() as i32 == cmsg.cmsg_type)
         {
-            *dst.as_ffi_mut() = unsafe { crate::cmsg::decode::<libc::c_int>(cmsg) };
+            *dst.as_ffi_mut() = unsafe { cmsg::decode::<libc::c_int>(cmsg) };
         }
     }
     Ok((n, address))
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::close;
 
     pub struct Socket {
         fd: RawFd,
-        addr: Option<SockAddr>,
+        pub addr: Option<SockAddr>,
+    }
+
+    impl Socket {
+        pub fn close(&mut self) {
+            unsafe {
+                close(&*self).ok();
+            }
+            self.fd = -1;
+        }
     }
 
     impl Socket {
@@ -863,7 +774,7 @@ mod tests {
         }
     }
 
-    fn localhost(domain: AddressFamily) -> SocketAddr {
+    pub fn localhost(domain: AddressFamily) -> SocketAddr {
         match domain {
             AddressFamily::Inet => {
                 SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 0))
@@ -878,14 +789,14 @@ mod tests {
         }
     }
 
-    fn create_socket(domain: AddressFamily, ty: SockType) -> Socket {
+    pub fn create_socket(domain: AddressFamily, ty: SockType) -> Socket {
         let mut fd = Socket::new(socket(domain, ty, SockFlags::new(), None).unwrap());
         bind(&fd, localhost(domain).into()).unwrap();
         fd.addr = Some(getsockname(&fd).unwrap());
         fd
     }
 
-    fn socket_pair(domain: AddressFamily, ty: SockType) -> (Socket, Socket) {
+    pub fn socket_pair(domain: AddressFamily, ty: SockType) -> (Socket, Socket) {
         let s1 = create_socket(domain, ty);
         let s2 = create_socket(domain, ty);
         (s1, s2)
@@ -913,53 +824,10 @@ mod tests {
     }
 
     #[test]
-    fn test_ip4_recvtos_option() {
-        let (s1, s2) = socket_pair(AddressFamily::Inet, SockType::Datagram);
-        setsockopt(&s1, Ip4RecvTos::new(true)).unwrap();
-        setsockopt(&s2, Ip4RecvTos::new(true)).unwrap();
-
-        let tos = getsockopt::<_, Ip4RecvTos>(&s1).unwrap();
-        assert_eq!(tos.value(), true);
-        sendmsg(
-            &s1,
-            s2.addr.as_ref(),
-            b"hello",
-            &[&Ip4Tos::new(3)],
-            MsgFlags::new(),
-        )
-        .unwrap();
-
-        let mut buf = [0u8; 10];
-        let mut tos = Ip4Tos::default();
-        let (len, addr) = recvmsg(&s2, &mut buf, &mut [&mut tos], MsgFlags::new()).unwrap();
-        assert_eq!(addr, s1.addr.unwrap());
-        assert_eq!(buf[..len], b"hello"[..]);
-        assert_eq!(tos.value(), 3);
-    }
-
-    #[test]
-    #[ignore]
-    fn test_ip6_recvtclass_option() {
-        let (s1, s2) = socket_pair(AddressFamily::Inet6, SockType::Datagram);
-        setsockopt(&s1, Ip6RecvTclass::new(true)).unwrap();
-        setsockopt(&s2, Ip6RecvTclass::new(true)).unwrap();
-
-        let tclass = getsockopt::<_, Ip6RecvTclass>(&s1).unwrap();
-        assert_eq!(tclass.value(), true);
-        sendmsg(
-            &s1,
-            s2.addr.as_ref(),
-            b"hello",
-            &[&Ip6Tclass::new(3)],
-            MsgFlags::new(),
-        )
-        .unwrap();
-
-        let mut buf = [0u8; 10];
-        let mut tclass = Ip6Tclass::default();
-        let (len, addr) = recvmsg(&s2, &mut buf, &mut [&mut tclass], MsgFlags::new()).unwrap();
-        assert_eq!(addr, s1.addr.unwrap());
-        assert_eq!(buf[..len], b"hello"[..]);
-        assert_eq!(tclass.value(), 3);
+    fn test_correct_port() {
+        let addr: SocketAddr = "127.0.0.1:40".parse().unwrap();
+        let addr: SockAddr = addr.into();
+        let addr: SocketAddr = addr.try_into().unwrap();
+        assert_eq!(addr.port(), 40);
     }
 }

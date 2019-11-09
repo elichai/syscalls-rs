@@ -2,11 +2,8 @@
 #![allow(clippy::missing_safety_doc)]
 
 mod arch;
-mod cmsg;
-mod socket;
+pub mod socket;
 pub(crate) mod utils;
-
-pub use socket::*;
 
 use arch::Syscalls;
 use std::ffi::CStr;
