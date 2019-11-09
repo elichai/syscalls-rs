@@ -3,7 +3,7 @@ use std::env;
 
 const ISSUE: &str = "https://github.com/elichai/syscalls-rs/issues";
 
-const FILES: &[&str] = &["fcntl", "time", "fs"];
+const FILES: &[&str] = &["fcntl", "time", "fs", "signal"];
 
 fn main() {
     let path = get_target_arch_dir();
@@ -17,8 +17,9 @@ fn main() {
             .derive_copy(true)
             .derive_debug(true)
             .derive_default(true)
-            .clang_arg("-nostdinc")
+//            .clang_arg("-nostdinc") // Do we need to disable C's std or not? stdlib enabled because of size_t
             .clang_arg(&format!("-I{}/include", path))
+            .header("stddef.h") // This is required because of missing `size_t` declaration in the header.
             .header(format!("{}/include/linux/{}.h", path, file))
             .raw_line("#![allow(dead_code,non_camel_case_types,non_snake_case)]")
             .generate()
