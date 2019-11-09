@@ -377,12 +377,15 @@ mod tests {
     }
 
     #[test]
+    #[ignore] // TODO doesn't work on travis
     fn test_flowlabel() {
         let (s1, mut s2) = socket_pair(AddressFamily::Inet6, SockType::Datagram);
         let mut addr: SocketAddrV6 = s2.addr.unwrap().try_into().unwrap();
         // flow info needs to be larger than 255
         addr.set_flowinfo(256);
         s2.addr = Some(addr.into());
+        // this option only has an effect if auto_flowlabels is set to 2
+        // sudo sysctl -n net.ipv6.auto_flowlabels=2
         set_option(
             &s1,
             Ip6AutoFlowLabel::new(false),

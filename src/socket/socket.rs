@@ -813,7 +813,6 @@ pub(crate) mod tests {
     }
 
     #[test]
-    #[ignore]
     fn test_socket_ip6_udp() {
         let (s1, s2) = socket_pair(AddressFamily::Inet6, SockType::Datagram);
         sendmsg(&s1, s2.addr.as_ref(), b"hello", &[], MsgFlags::new()).unwrap();

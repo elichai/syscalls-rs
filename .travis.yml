@@ -1,13 +1,16 @@
 language: rust
-sudo: false
 cache: false
 os:
   - linux
 rust:
   - nightly
 
+before_script:
+  - sudo sh -c 'echo 0 > /proc/sys/net/ipv6/conf/all/disable_ipv6'
+
 script:
   - cargo build --verbose
+  - export RUST_BACKTRACE=1
   - cargo test --verbose
 
 notifications:
