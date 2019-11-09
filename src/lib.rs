@@ -13,12 +13,14 @@ use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, mem::size_of, ptr};
 
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
-use libc::{
-    flock, timeval, AT_FDCWD, ERANGE, O_CLOEXEC, O_CREAT, O_LARGEFILE, O_TMPFILE, PATH_MAX,
-    RENAME_EXCHANGE, RENAME_NOREPLACE, SHUT_RD, SHUT_RDWR, SHUT_WR,
-};
 use std::os::raw::c_char;
 use std::path::PathBuf;
+
+use libc::{SHUT_RD, SHUT_RDWR, SHUT_WR, ERANGE};
+
+use linux_sys::fcntl::{flock, AT_FDCWD, O_CREAT, O_LARGEFILE, O_TMPFILE, O_CLOEXEC};
+use linux_sys::time::timeval;
+use linux_sys::fs::{RENAME_EXCHANGE, RENAME_NOREPLACE, PATH_MAX};
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
@@ -34,7 +36,7 @@ impl AsRawFd for FileDescriptor {
     }
 }
 
-const CURRENT_CWD_FD: FileDescriptor = FileDescriptor(AT_FDCWD);
+const CURRENT_CWD_FD: FileDescriptor = FileDescriptor(AT_FDCWD as _);
 
 // TODO: Is there any way to make this safe? https://github.com/rust-lang/rfcs/issues/1043#issuecomment-542904091
 // TODO: Read into all ways that writing the a "bad" file descriptor violate rust's safety.
@@ -65,7 +67,7 @@ pub unsafe fn read<F: AsRawFd>(fd: &F, buf: &mut [u8]) -> io::Result<usize> {
 // TODO: Should we just call openat? (that's what glibc and the kernel itself do).
 // In kernels older than 3.2 this requires a special racy handling for FD_CLOEXEC. But rust doesn't support these kernels anyway https://github.com/rust-lang/libc/issues/1412#issuecomment-543621431
 #[inline]
-pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<usize> {
+pub unsafe fn open(path: &CStr, oflags: u32, mode: Option<u32>) -> io::Result<usize> {
     // TODO: Look into a `#ifdef __O_TMPFILE` in glibc. are there times when we don't care about this? Maybe old kernels?.
     let mut mode_t = 0;
     if (oflags & O_CREAT) != 0 || (oflags & O_TMPFILE) == O_TMPFILE {
@@ -89,7 +91,7 @@ pub unsafe fn open(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<us
 
 // TODO: maybe this should just be the default?.
 #[inline]
-pub unsafe fn open64(path: &CStr, oflags: i32, mode: Option<u32>) -> io::Result<usize> {
+pub unsafe fn open64(path: &CStr, oflags: u32, mode: Option<u32>) -> io::Result<usize> {
     open(path, oflags | O_LARGEFILE, mode)
 }
 
@@ -107,7 +109,7 @@ pub fn _exit(status: i32) -> ! {
 // TODO: glibc just calls mkdirat with AT_FDCWD. musl has this as an ifdef. what should we do?.
 // TODO: Should we return Result<()>?.
 #[inline]
-pub unsafe fn mkdir(path: &CStr, mode: i32) -> io::Result<usize> {
+pub unsafe fn mkdir(path: &CStr, mode: u32) -> io::Result<usize> {
     let res = syscall!(Syscalls::Mkdir, path.as_ptr() as isize, mode as isize);
     result!(res)
 }
@@ -160,7 +162,7 @@ pub unsafe fn getrandom(buf: &mut [u8], flags: Option<u32>) -> io::Result<usize>
 
 // TODO: Any better abstraction for the pid? (https://doc.rust-lang.org/std/process/struct.Child.html#method.id)
 #[inline]
-pub unsafe fn kill(pid: u32, signal: i32) -> io::Result<usize> {
+pub unsafe fn kill(pid: u32, signal: u32) -> io::Result<usize> {
     let res = syscall!(Syscalls::Kill, pid as isize, signal as isize);
     result!(res)
 }
@@ -334,7 +336,8 @@ pub unsafe fn fcntl<F: AsRawFd>(fd: F, cmd: u32, arg: FcntlArg) -> io::Result<us
 #[cfg(test)]
 mod tests {
     use super::write;
-    use libc::{O_CLOEXEC, O_RDWR, O_SYNC, SIGTERM};
+    use linux_sys::fcntl::{O_CLOEXEC, O_RDWR, O_SYNC};
+    use linux_sys::signal::SIGTERM;
     use std::env;
     use std::ffi::{CString, CStr};
     use std::fs::{remove_file, File, OpenOptions};
