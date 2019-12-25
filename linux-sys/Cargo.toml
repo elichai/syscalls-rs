@@ -4,5 +4,11 @@ version = "0.1.0"
 authors = ["Elichai Turkel <elichai.turkel@gmail.com>"]
 edition = "2018"
 
+include = [
+    "src/lib.rs",
+    "Cargo.toml",
+    "headers_install/*"
+]
+
 [build-dependencies]
 bindgen = {version = "0.51", default-features = false, features = ["which-rustfmt"] }
