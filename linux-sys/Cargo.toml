@@ -4,11 +4,5 @@ version = "0.1.0"
 authors = ["Elichai Turkel <elichai.turkel@gmail.com>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[dependencies]
-
-
-
 [build-dependencies]
-bindgen = "0.51"
+bindgen = {version = "0.51", default-features = false, features = ["which-rustfmt"] }

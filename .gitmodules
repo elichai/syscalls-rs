@@ -1,3 +1,5 @@
 [submodule "linux-sys/linux"]
 	path = linux-sys/linux
 	url = https://github.com/torvalds/linux.git
+	shallow = true
+	branch = v5.4
