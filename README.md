@@ -79,7 +79,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] poll
  - [ ] accept
  - [x] shutdown
- - [ ] chdir
+ - [x] chdir
  - [ ] getuid
  - [ ] getpid
  - [ ] getppid
@@ -133,7 +133,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] memchr
  - [ ] gai_strerror
  - [ ] res_init
- - [ ] getcwd
+ - [x] getcwd
  - [ ] sysconf
  - [ ] getpwuid_r
  - [ ] gnu_get_libc_version

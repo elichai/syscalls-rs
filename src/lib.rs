@@ -6,16 +6,19 @@ pub mod socket;
 pub(crate) mod utils;
 
 use arch::Syscalls;
-use std::ffi::CStr;
+use std::ffi::{CStr, OsString};
 use std::mem::MaybeUninit;
+use std::os::unix::ffi::OsStringExt;
 use std::os::unix::io::{AsRawFd, RawFd};
 use std::{io, mem::size_of, ptr};
 
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
 use libc::{
-    flock, timeval, AT_FDCWD, O_CLOEXEC, O_CREAT, O_LARGEFILE, O_TMPFILE, RENAME_EXCHANGE,
-    RENAME_NOREPLACE, SHUT_RD, SHUT_RDWR, SHUT_WR,
+    flock, timeval, AT_FDCWD, ERANGE, O_CLOEXEC, O_CREAT, O_LARGEFILE, O_TMPFILE, PATH_MAX,
+    RENAME_EXCHANGE, RENAME_NOREPLACE, SHUT_RD, SHUT_RDWR, SHUT_WR,
 };
+use std::os::raw::c_char;
+use std::path::PathBuf;
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
@@ -162,8 +165,37 @@ pub unsafe fn kill(pid: u32, signal: i32) -> io::Result<usize> {
     result!(res)
 }
 
+#[inline]
+pub unsafe fn getcwd() -> io::Result<PathBuf> {
+    let mut buf = Vec::with_capacity(PATH_MAX as usize);
+    let res = syscall!(Syscalls::Getcwd, buf.as_mut_ptr() as isize);
+    if res < 0 {
+        assert_ne!((-res as i32), ERANGE);
+        Err(std::io::Error::from_raw_os_error(-res as i32))
+    } else {
+        assert!(!(res as *const c_char).is_null()); // Should I just replace with `assert_ne!(res, 0)`?.
+        let ptr = buf.as_ptr() as *const c_char;
+        let len = CStr::from_ptr(ptr).to_bytes().len();
+        buf.set_len(len);
+        Ok(PathBuf::from(OsString::from_vec(buf)))
+    }
+}
+
+#[inline]
+pub unsafe fn chdir(path: &CStr) -> io::Result<usize> {
+    let res = syscall!(Syscalls::Chdir, path.as_ptr() as isize);
+    result!(res)
+}
+
+#[inline]
+pub unsafe fn fchdir<F: AsRawFd>(fd: &F) -> io::Result<usize> {
+    let res = syscall!(Syscalls::Fchdir, fd.as_raw_fd() as isize);
+    result!(res)
+}
+
 // `RENAME_EXCHANGE` and `RENAME_NOREPLACE` are mutually exclusive. so make sense to have an enum.
 // TODO: Linux 3.18+ supports also `RENAME_WHITEOUT`. Open Question 12.
+#[non_exhaustive]
 pub enum RenameAt2Flags {
     ExchangeAtomically = RENAME_EXCHANGE as isize,
     RenameOnly = RENAME_NOREPLACE as isize,
@@ -304,7 +336,7 @@ mod tests {
     use super::write;
     use libc::{O_CLOEXEC, O_RDWR, O_SYNC, SIGTERM};
     use std::env;
-    use std::ffi::CString;
+    use std::ffi::{CString, CStr};
     use std::fs::{remove_file, File, OpenOptions};
     use std::io::{self, Read, Seek, SeekFrom, Write};
     use std::ops::{Deref, DerefMut};
@@ -391,6 +423,30 @@ mod tests {
         assert_eq!(err.to_string(), "Permission denied (os error 13)");
 
         remove_file(&p_path).unwrap();
+    }
+
+
+    #[test]
+    // Requires running with `cargo test -- --test-threads 1` because it changes the cwd.
+    fn test_cwd() {
+        let original = env::current_dir().unwrap();
+        let raw = unsafe {super::getcwd()}.unwrap();
+        assert_eq!(original, raw);
+
+        let path = CStr::from_bytes_with_nul(b"../\0").unwrap();
+        let r = unsafe {super::chdir(path)}.unwrap();
+        assert_eq!(r, 0);
+        let raw = unsafe {super::getcwd()}.unwrap();
+        let mut popped = original.clone();
+        popped.pop();
+        assert_eq!(popped, raw);
+
+        let path = CStr::from_bytes_with_nul(b"./syscalls-rs\0").unwrap();
+        let fd = super::FileDescriptor(unsafe {super::open(path, O_CLOEXEC, None)}.unwrap() as _);
+        let r = unsafe {super::fchdir(&fd)}.unwrap();
+        assert_eq!(r, 0);
+        let raw = unsafe {super::getcwd()}.unwrap();
+        assert_eq!(original, raw);
     }
 
     #[test]
