@@ -1,10 +1,11 @@
 use crate::arch::Syscalls;
 use crate::{result, syscall};
 use std::io;
-use std::os::unix::io::RawFd;
 
 /// Constants used to specify the protocol family to be used in [`socket`](fn.socket.html).
+/// TODO: Should we include them all?
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum AddressFamily {
     /// Local communication ([`unix(7)`](http://man7.org/linux/man-pages/man7/unix.7.html)).
     Unix = libc::AF_UNIX as isize,
@@ -36,7 +37,9 @@ pub enum SockType {
 
 /// Constants used in [`socket`](fn.socket.html) and [`socketpair`](fn.socketpair.html)
 /// to specify the protocol to use.
+/// Which protocols should we add?
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[non_exhaustive]
 pub enum SockProtocol {
     /// TCP protocol ([ip(7)](http://man7.org/linux/man-pages/man7/ip.7.html)).
     Tcp = libc::IPPROTO_TCP as isize,
@@ -45,13 +48,13 @@ pub enum SockProtocol {
 }
 
 /// Additional socket options.
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq, Default)]
 pub struct SockFlags(isize);
 
 impl SockFlags {
     /// Creates new `SocketFlags`.
     pub fn new() -> Self {
-        Self(0)
+        Default::default()
     }
 
     /// Set non-blocking mode on the new socket.
@@ -77,36 +80,16 @@ impl core::fmt::Debug for SockFlags {
 }
 
 #[inline]
-pub fn socket(
+pub unsafe fn socket(
     domain: AddressFamily,
-    sock: SockType,
+    sock_type: SockType,
     flags: SockFlags,
     protocol: Option<SockProtocol>,
-) -> io::Result<RawFd> {
+) -> io::Result<usize> {
     // flags only supported by kernel >= 2.6.27
-    let ty = sock as isize | flags.0;
+    let ty = sock_type as isize | flags.0;
     let protocol = protocol.map(|proto| proto as isize).unwrap_or(0);
-    __socket(domain as isize, ty, protocol).map(|fd| fd as RawFd)
-}
-
-#[cfg(target_os = "linux")]
-#[inline(always)]
-fn __socket(domain: isize, ty: isize, protocol: isize) -> io::Result<usize> {
-    let res = unsafe {
-        syscall!(
-            Syscalls::Socket,
-            domain,
-            ty,
-            protocol
-        )
-    };
-    result!(res)
-}
-
-#[cfg(not(target_os = "linux"))]
-#[inline(always)]
-fn __socket(domain: isize, ty: isize, protocol: isize) -> io::Result<usize> {
-    let res = unsafe { libc::socket(domain as i32, ty as i32, protocol as i32) };
+    let res = syscall!(Syscalls::Socket, domain as isize, ty, protocol);
     result!(res)
 }
 
@@ -114,7 +97,7 @@ fn __socket(domain: isize, ty: isize, protocol: isize) -> io::Result<usize> {
 pub(crate) mod tests {
     use super::*;
     use crate::close;
-    use std::os::unix::io::AsRawFd;
+    use std::os::unix::io::{AsRawFd, RawFd};
 
     pub struct Socket {
         fd: RawFd,
@@ -157,12 +140,15 @@ pub(crate) mod tests {
 
     #[test]
     fn test_socket() {
-        let rawfd = socket(
-            AddressFamily::Inet,
-            SockType::Datagram,
-            SockFlags::new(),
-            None,
-        ).unwrap();
-        Socket::new(rawfd);
+        let rawfd = unsafe {
+            socket(
+                AddressFamily::Inet,
+                SockType::Datagram,
+                SockFlags::new(),
+                None,
+            )
+        }
+        .unwrap();
+        Socket::new(rawfd as RawFd);
     }
 }
