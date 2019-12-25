@@ -74,7 +74,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] link
  - [ ] syscall
  - [ ] signal
- - [ ] socket
+ - [c] socket
  - [ ] socketpair
  - [ ] poll
  - [ ] accept
@@ -88,7 +88,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [x] kill
  - [ ] fork
  - [x] _exit
- - [ ] dup2
+ - [x] dup2
  - [ ] setgid
  - [ ] setgroups
  - [ ] setuid

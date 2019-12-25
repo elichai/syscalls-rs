@@ -13,8 +13,8 @@ use std::{io, mem::size_of, ptr};
 
 // TODO: Remove libc. Currently *only* used for getting typedefs for flags.
 use libc::{
-    flock, timeval, AT_FDCWD, O_CREAT, O_LARGEFILE, O_TMPFILE, RENAME_EXCHANGE, RENAME_NOREPLACE,
-    SHUT_RD, SHUT_RDWR, SHUT_WR,
+    flock, timeval, AT_FDCWD, O_CLOEXEC, O_CREAT, O_LARGEFILE, O_TMPFILE, RENAME_EXCHANGE,
+    RENAME_NOREPLACE, SHUT_RD, SHUT_RDWR, SHUT_WR,
 };
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
@@ -194,6 +194,25 @@ pub unsafe fn renameat2<F1: AsRawFd, F2: AsRawFd>(
 #[inline]
 pub unsafe fn rename(old_path: &CStr, new_path: &CStr) -> io::Result<usize> {
     renameat2(&CURRENT_CWD_FD, old_path, &CURRENT_CWD_FD, new_path, None)
+}
+
+// TODO: Return Result<()>.
+#[inline]
+pub unsafe fn dup3<F1: AsRawFd, F2: AsRawFd>(
+    old_fd: &F1,
+    new_fd: &F2,
+    close_on_exec: Option<bool>,
+) -> io::Result<usize> {
+    let close_on_exec = close_on_exec
+        .map(|f| if f { O_CLOEXEC } else { 0 })
+        .unwrap_or(0);
+    let res = syscall!(
+        Syscalls::Dup3,
+        old_fd.as_raw_fd() as isize,
+        new_fd.as_raw_fd() as isize,
+        close_on_exec as isize,
+    );
+    result!(res)
 }
 
 // See: https://doc.rust-lang.org/std/net/enum.Shutdown.html
