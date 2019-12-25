@@ -2,6 +2,7 @@
 #![allow(clippy::missing_safety_doc)]
 
 mod arch;
+pub mod socket;
 pub(crate) mod utils;
 
 use arch::Syscalls;
