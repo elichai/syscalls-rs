@@ -16,10 +16,11 @@ use std::{io, mem::size_of, ptr};
 use std::os::raw::c_char;
 use std::path::PathBuf;
 
-use libc::{SHUT_RD, SHUT_RDWR, SHUT_WR, ERANGE};
+use libc::{SHUT_RD, SHUT_RDWR, SHUT_WR};
 
 use linux_sys::fcntl::{flock, AT_FDCWD, O_CREAT, O_LARGEFILE, O_TMPFILE, O_CLOEXEC};
 use linux_sys::time::timeval;
+use linux_sys::errno::ERANGE;
 use linux_sys::fs::{RENAME_EXCHANGE, RENAME_NOREPLACE, PATH_MAX};
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
@@ -172,7 +173,7 @@ pub unsafe fn getcwd() -> io::Result<PathBuf> {
     let mut buf = Vec::with_capacity(PATH_MAX as usize);
     let res = syscall!(Syscalls::Getcwd, buf.as_mut_ptr() as isize);
     if res < 0 {
-        assert_ne!((-res as i32), ERANGE);
+        assert_ne!((-res as u32), ERANGE);
         Err(std::io::Error::from_raw_os_error(-res as i32))
     } else {
         assert!(!(res as *const c_char).is_null()); // Should I just replace with `assert_ne!(res, 0)`?.
