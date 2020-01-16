@@ -1,14 +1,34 @@
 language: rust
-sudo: false
 cache: false
+git:
+  submodules: false
+addons:
+  apt:
+    packages:
+      - libclang-dev
+      - clang
+      - llvm
 os:
   - linux
+arch:
+  - amd64
+  - arm64
 rust:
   - nightly
+  - stable
+  - beta
+compiler:
+  - clang
 
 script:
+  - if [ "${TRAVIS_RUST_VERSION}" == "nightly" ] && [ "${TRAVIS_CPU_ARCH}" == "amd64" ]; then
+      cargo build --verbose;
+      cargo test --verbose;
+    fi
+  - cd linux-sys
   - cargo build --verbose
   - cargo test --verbose
+
 
 notifications:
   email:
