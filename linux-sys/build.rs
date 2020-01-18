@@ -44,7 +44,7 @@ fn unrecognized_arch() -> ! {
 fn get_target_arch_dir() -> String {
     let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
     let str_arch = match arch.as_str() {
-        "i686" | "x86_64" | "i586" => "x86",
+        "i686" | "x86_64" | "i586" | "x86" => "x86",
         "aarch64" => "arm64",
         "arm" | "armv5te" | "armv7" | "armv4t" | "thumbv7neon" => "arm",
         "mips" | "mips64" | "mips64el" | "mipsel" | "mipsisa32r6" | "mipsisa32r6el"
