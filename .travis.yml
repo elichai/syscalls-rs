@@ -1,5 +1,5 @@
 language: rust
-cache: false
+cache: cargo
 git:
   submodules: false
 addons:
@@ -10,9 +10,13 @@ addons:
       - llvm
 os:
   - linux
+dis:
+  - bionic
 arch:
   - amd64
   - arm64
+  - s390x
+  - ppc64le
 rust:
   - nightly
   - stable
@@ -22,8 +26,11 @@ compiler:
 
 script:
   - if [ "${TRAVIS_RUST_VERSION}" == "nightly" ] && [ "${TRAVIS_CPU_ARCH}" == "amd64" ]; then
+      sudo -E apt-get -yq --no-install-suggests --no-install-recommends $(travis_apt_get_options) install gcc-multilib;
+      rustup target install i686-unknown-linux-gnu;
       cargo build --verbose;
       cargo test --verbose;
+      cargo test --verbose --target=i686-unknown-linux-gnu;
     fi
   - cd linux-sys
   - cargo build --verbose
