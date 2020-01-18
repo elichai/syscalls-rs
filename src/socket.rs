@@ -71,7 +71,7 @@ impl SockFlags {
 }
 
 impl core::fmt::Debug for SockFlags {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SockFlags")
             .field("NONBLOCK", &(self.0 & libc::SOCK_NONBLOCK as isize > 0))
             .field("CLOEXEC", &(self.0 & libc::SOCK_CLOEXEC as isize > 0))

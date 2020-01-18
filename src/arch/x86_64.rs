@@ -4,7 +4,7 @@
 #[rustfmt::skip]
 pub unsafe fn syscall0(n: isize) -> isize {
     let mut ret: usize;
-    asm! {"syscall": "={rax}"(ret) : "{rax}"(n) : "rcx", "r11", "memory" : "volatile"};
+    asm! {"syscall": "={rax}"(ret) : "{rax}"(n) : "cc", "rcx", "r11", "memory" : "volatile"};
     ret as isize
 }
 
@@ -12,7 +12,7 @@ pub unsafe fn syscall0(n: isize) -> isize {
 #[rustfmt::skip]
 pub unsafe fn syscall1(n: isize, a1: isize) -> isize {
     let mut ret: usize;
-    asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) : "rcx", "r11", "memory" : "volatile"};
+    asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) : "cc", "rcx", "r11", "memory" : "volatile"};
     ret as isize
 }
 
@@ -21,7 +21,7 @@ pub unsafe fn syscall1(n: isize, a1: isize) -> isize {
 pub unsafe fn syscall2(n: isize, a1: isize, a2: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2)
-          : "rcx", "r11", "memory" : "volatile"};
+          : "cc", "rcx", "r11", "memory" : "volatile"};
     ret as isize
 }
 
@@ -30,7 +30,7 @@ pub unsafe fn syscall2(n: isize, a1: isize, a2: isize) -> isize {
 pub unsafe fn syscall3(n: isize, a1: isize, a2: isize, a3: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
-          "{rdx}"(a3) : "rcx", "r11", "memory" : "volatile"};
+          "{rdx}"(a3) : "cc", "rcx", "r11", "memory" : "volatile"};
     ret as isize
 }
 
@@ -39,7 +39,7 @@ pub unsafe fn syscall3(n: isize, a1: isize, a2: isize, a3: isize) -> isize {
 pub unsafe fn syscall4(n: isize, a1: isize, a2: isize, a3: isize, a4: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
-          "{rdx}"(a3), "{r10}"(a4) : "rcx", "r11", "memory" : "volatile"};
+          "{rdx}"(a3), "{r10}"(a4) : "cc", "rcx", "r11", "memory" : "volatile"};
     ret as isize
 }
 
@@ -48,7 +48,7 @@ pub unsafe fn syscall4(n: isize, a1: isize, a2: isize, a3: isize, a4: isize) -> 
 pub unsafe fn syscall5(n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
-          "{rdx}"(a3), "{r10}"(a4), "{r8}"(a5) : "rcx", "r11", "memory" : "volatile"};
+          "{rdx}"(a3), "{r10}"(a4), "{r8}"(a5) : "cc", "rcx", "r11", "memory" : "volatile"};
     ret as isize
 }
 
@@ -57,7 +57,7 @@ pub unsafe fn syscall5(n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5:
 pub unsafe fn syscall6(n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5: isize, a6: isize) -> isize {
     let mut ret: usize;
     asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
-          "{rdx}"(a3), "{r10}"(a4), "{r8}"(a5), "{r9}"(a6) : "rcx", "r11", "memory" : "volatile"};
+          "{rdx}"(a3), "{r10}"(a4), "{r8}"(a5), "{r9}"(a6) : "cc", "rcx", "r11", "memory" : "volatile"};
     ret as isize
 }
 
