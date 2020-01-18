@@ -18,10 +18,10 @@ use std::path::PathBuf;
 
 use libc::{SHUT_RD, SHUT_RDWR, SHUT_WR};
 
-use linux_sys::fcntl::{flock, AT_FDCWD, O_CREAT, O_LARGEFILE, O_TMPFILE, O_CLOEXEC};
-use linux_sys::time::timeval;
 use linux_sys::errno::ERANGE;
-use linux_sys::fs::{RENAME_EXCHANGE, RENAME_NOREPLACE, PATH_MAX};
+use linux_sys::fcntl::{flock, AT_FDCWD, O_CLOEXEC, O_CREAT, O_LARGEFILE, O_TMPFILE};
+use linux_sys::fs::{PATH_MAX, RENAME_EXCHANGE, RENAME_NOREPLACE};
+use linux_sys::time::timeval;
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
@@ -283,7 +283,7 @@ pub enum FcntlArg<'a> {
 }
 
 impl From<FcntlArg<'_>> for isize {
-    fn from(arg: FcntlArg) -> isize {
+    fn from(arg: FcntlArg<'_>) -> isize {
         match arg {
             FcntlArg::Flock(r) => r as *mut flock as isize,
             FcntlArg::Flags(flag) => flag as isize,
@@ -328,7 +328,7 @@ impl<F: AsRawFd> FcntlCommand<'_, F> {
 
 // TODO: Both musl and glibc has ifdefs on `__USE_FILE_OFFSET64` and `__USE_LARGEFILE64` on 32bit machines. for a bigger `off_t` in flock.
 #[inline]
-pub unsafe fn fcntl<F: AsRawFd>(fd: F, cmd: u32, arg: FcntlArg) -> io::Result<usize> {
+pub unsafe fn fcntl<F: AsRawFd>(fd: F, cmd: u32, arg: FcntlArg<'_>) -> io::Result<usize> {
     let _ = (fd, cmd, arg);
     unimplemented!();
     // TODO: Requires a deeper thought and discussion on how these should be done best.
@@ -340,7 +340,7 @@ mod tests {
     use linux_sys::fcntl::{O_CLOEXEC, O_RDWR, O_SYNC};
     use linux_sys::signal::SIGTERM;
     use std::env;
-    use std::ffi::{CString, CStr};
+    use std::ffi::{CStr, CString};
     use std::fs::{remove_file, File, OpenOptions};
     use std::io::{self, Read, Seek, SeekFrom, Write};
     use std::ops::{Deref, DerefMut};
@@ -429,27 +429,26 @@ mod tests {
         remove_file(&p_path).unwrap();
     }
 
-
     #[test]
     // Requires running with `cargo test -- --test-threads 1` because it changes the cwd.
     fn test_cwd() {
         let original = env::current_dir().unwrap();
-        let raw = unsafe {super::getcwd()}.unwrap();
+        let raw = unsafe { super::getcwd() }.unwrap();
         assert_eq!(original, raw);
 
         let path = CStr::from_bytes_with_nul(b"../\0").unwrap();
-        let r = unsafe {super::chdir(path)}.unwrap();
+        let r = unsafe { super::chdir(path) }.unwrap();
         assert_eq!(r, 0);
-        let raw = unsafe {super::getcwd()}.unwrap();
+        let raw = unsafe { super::getcwd() }.unwrap();
         let mut popped = original.clone();
         popped.pop();
         assert_eq!(popped, raw);
 
         let path = CStr::from_bytes_with_nul(b"./syscalls-rs\0").unwrap();
-        let fd = super::FileDescriptor(unsafe {super::open(path, O_CLOEXEC, None)}.unwrap() as _);
-        let r = unsafe {super::fchdir(&fd)}.unwrap();
+        let fd = super::FileDescriptor(unsafe { super::open(path, O_CLOEXEC, None) }.unwrap() as _);
+        let r = unsafe { super::fchdir(&fd) }.unwrap();
         assert_eq!(r, 0);
-        let raw = unsafe {super::getcwd()}.unwrap();
+        let raw = unsafe { super::getcwd() }.unwrap();
         assert_eq!(original, raw);
     }
 
