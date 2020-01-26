@@ -7,6 +7,7 @@ const FILES: &[&str] = &["fcntl", "time", "fs", "signal", "errno", "socket", "in
 
 fn main() {
     let path = get_target_arch_dir();
+    let out_path = env::var("OUT_DIR").unwrap();
     for file in FILES {
         builder()
             .default_enum_style(EnumVariation::Rust {
@@ -21,10 +22,10 @@ fn main() {
             .clang_arg(&format!("-I{}/include", path))
             .header("stddef.h") // This is required because of missing `size_t` declaration in the header.
             .header(format!("{}/include/linux/{}.h", path, file))
-            .raw_line("#![allow(dead_code,non_camel_case_types,non_snake_case)]")
+//            .raw_line("#![allow(dead_code,non_camel_case_types,non_snake_case)]")
             .generate()
             .expect(&format!("Unable to generate bindings, file: {}", file))
-            .write_to_file(format!("src/{}.rs", file))
+            .write_to_file(format!("{}/{}.rs", out_path, file))
             .expect("Couldn't write bindings to file");
     }
 }

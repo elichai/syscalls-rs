@@ -3,9 +3,14 @@ name = "linux-sys"
 version = "0.0.0"
 authors = ["Elichai Turkel <elichai.turkel@gmail.com>"]
 edition = "2018"
+license = "MIT/Apache-2.0"
+categories = ["external-ffi-bindings"]
+keywords = ["ffi", "linux", "uapi", "posix", "libc"]
+description = "FFI bindings to linux UAPI"
 
 include = [
     "src/lib.rs",
+    "build.rs",
     "Cargo.toml",
     "headers_install/*"
 ]
