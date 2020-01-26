@@ -3,7 +3,7 @@ use std::env;
 
 const ISSUE: &str = "https://github.com/elichai/syscalls-rs/issues";
 
-const FILES: &[&str] = &["fcntl", "time", "fs", "signal", "errno"];
+const FILES: &[&str] = &["fcntl", "time", "fs", "signal", "errno", "socket", "in"];
 
 fn main() {
     let path = get_target_arch_dir();
