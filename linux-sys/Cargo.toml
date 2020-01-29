@@ -4,6 +4,7 @@ version = "0.0.0"
 authors = ["Elichai Turkel <elichai.turkel@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
+repository = "https://github.com/elichai/syscalls-rs"
 categories = ["external-ffi-bindings"]
 keywords = ["ffi", "linux", "uapi", "posix", "libc"]
 description = "FFI bindings to linux UAPI"
@@ -12,8 +13,12 @@ include = [
     "src/lib.rs",
     "build.rs",
     "Cargo.toml",
-    "headers_install/*"
+    "headers_install/*",
+    "wrapper.h",
 ]
+
+[dependencies]
+cty = { version = "0.2.1", optional = true }
 
 [build-dependencies]
 bindgen = {version = "0.51", default-features = false, features = ["which-rustfmt"] }

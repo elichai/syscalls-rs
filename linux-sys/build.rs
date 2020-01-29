@@ -1,33 +1,40 @@
 use bindgen::{builder, EnumVariation, RustTarget};
 use std::env;
+use std::path::PathBuf;
 
 const ISSUE: &str = "https://github.com/elichai/syscalls-rs/issues";
 
-const FILES: &[&str] = &["fcntl", "time", "fs", "signal", "errno", "socket", "in"];
+// We can rely on include order to first include our `#include <linux/*.h>` before the system ones as long as the compiler is unix compliant
+// See: https://pubs.opengroup.org/onlinepubs/9699919799/utilities/c99.html
+// https://gcc.gnu.org/onlinedocs/cpp/Invocation.html#Invocation
+// https://llvm.org/docs/CodingStandards.html#include-style
 
 fn main() {
     let path = get_target_arch_dir();
-    let out_path = env::var("OUT_DIR").unwrap();
-    for file in FILES {
-        builder()
-            .default_enum_style(EnumVariation::Rust {
-                non_exhaustive: true,
-            })
-            .rust_target(RustTarget::Nightly)
-            .array_pointers_in_arguments(true)
-            .derive_copy(true)
-            .derive_debug(true)
-            .derive_default(true)
-//            .clang_arg("-nostdinc") // Do we need to disable C's std or not? stdlib enabled because of size_t
-            .clang_arg(&format!("-I{}/include", path))
-            .header("stddef.h") // This is required because of missing `size_t` declaration in the header.
-            .header(format!("{}/include/linux/{}.h", path, file))
-//            .raw_line("#![allow(dead_code,non_camel_case_types,non_snake_case)]")
-            .generate()
-            .expect(&format!("Unable to generate bindings, file: {}", file))
-            .write_to_file(format!("{}/{}.rs", out_path, file))
-            .expect("Couldn't write bindings to file");
-    }
+    let out_path = PathBuf::from(env::var("OUT_DIR").unwrap());
+
+    let mut build = builder();
+    if cfg!(feature = "cty") {
+        build = build.ctypes_prefix("::cty");
+    };
+    build
+        .use_core()
+        .default_enum_style(EnumVariation::Rust {
+            non_exhaustive: true,
+        })
+        .rust_target(RustTarget::Nightly)
+        .array_pointers_in_arguments(true)
+        .derive_copy(true)
+        .derive_debug(true)
+        .derive_default(true)
+        //        .clang_arg("-nostdinc") // Do we need to disable C's std or not? stdlib enabled because of size_t
+        .clang_arg(format!("-I{}/include", path))
+        .header("stddef.h") // This is required because of missing `size_t` declaration in the header.
+        .header("wrapper.h")
+        .generate()
+        .expect("Unable to generate bindings, wrapper.h")
+        .write_to_file(out_path.join("wrapper.rs"))
+        .expect("Couldn't write bindings to file");
 }
 
 fn unrecognized_arch() -> ! {
