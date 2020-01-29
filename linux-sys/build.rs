@@ -29,7 +29,7 @@ fn main() {
         .derive_default(true)
         //        .clang_arg("-nostdinc") // Do we need to disable C's std or not? stdlib enabled because of size_t
         .clang_arg(format!("-I{}/include", path))
-        .header("stddef.h") // This is required because of missing `size_t` declaration in the header.
+//        .header("stddef.h") // This is required because of missing `size_t` declaration in the header.
         .header("wrapper.h")
         .generate()
         .expect("Unable to generate bindings, wrapper.h")

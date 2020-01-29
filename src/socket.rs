@@ -2,17 +2,24 @@ use crate::arch::Syscalls;
 use crate::{result, syscall};
 use std::io;
 
+use libc::{
+    AF_INET, AF_INET6, AF_UNIX, SOCK_CLOEXEC, SOCK_DGRAM, SOCK_NONBLOCK, SOCK_RAW, SOCK_RDM,
+    SOCK_SEQPACKET, SOCK_STREAM,
+};
+
+use linux_sys::{IPPROTO_TCP, IPPROTO_UDP};
+
 /// Constants used to specify the protocol family to be used in [`socket`](fn.socket.html).
 /// TODO: Should we include them all?
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum AddressFamily {
     /// Local communication ([`unix(7)`](http://man7.org/linux/man-pages/man7/unix.7.html)).
-    Unix = libc::AF_UNIX as isize,
+    Unix = AF_UNIX as isize,
     /// IPv4 internet protocols ([`ip(7)`](http://man7.org/linux/man-pages/man7/ip.7.html)).
-    Inet = libc::AF_INET as isize,
+    Inet = AF_INET as isize,
     /// IPv6 internet protocols ([`ipv6(7)`](http://man7.org/linux/man-pages/man7/ipv6.7.html)).
-    Inet6 = libc::AF_INET6 as isize,
+    Inet6 = AF_INET6 as isize,
 }
 
 /// Constants used to specify the communication semantics when creating a
@@ -21,18 +28,18 @@ pub enum AddressFamily {
 pub enum SockType {
     /// Provides sequenced, reliable, two-way, connection based byte streams.
     /// An out-of-band data transmission mechanism may be supported.
-    Stream = libc::SOCK_STREAM as isize,
+    Stream = SOCK_STREAM as isize,
     /// Supports datagrams - connectionless, unreliable messages of a fixed
     /// maximum length.
-    Datagram = libc::SOCK_DGRAM as isize,
+    Datagram = SOCK_DGRAM as isize,
     /// Provides a sequenced, reliable, two-way connection based data
     /// transmission path for datagrams of fixed maximum length; a consumer is
     /// required to read an entire packet with each input system call.
-    SeqPacket = libc::SOCK_SEQPACKET as isize,
+    SeqPacket = SOCK_SEQPACKET as isize,
     /// Provides raw network protocol access.
-    Raw = libc::SOCK_RAW as isize,
+    Raw = SOCK_RAW as isize,
     /// Provides a reliable datagram layer that does not guarantee ordering.
-    Rdm = libc::SOCK_RDM as isize,
+    Rdm = SOCK_RDM as isize,
 }
 
 /// Constants used in [`socket`](fn.socket.html) and [`socketpair`](fn.socketpair.html)
@@ -42,9 +49,9 @@ pub enum SockType {
 #[non_exhaustive]
 pub enum SockProtocol {
     /// TCP protocol ([ip(7)](http://man7.org/linux/man-pages/man7/ip.7.html)).
-    Tcp = libc::IPPROTO_TCP as isize,
+    Tcp = IPPROTO_TCP as isize,
     /// UDP protocol ([ip(7)](http://man7.org/linux/man-pages/man7/ip.7.html)).
-    Udp = libc::IPPROTO_UDP as isize,
+    Udp = IPPROTO_UDP as isize,
 }
 
 /// Additional socket options.
@@ -59,13 +66,13 @@ impl SockFlags {
 
     /// Set non-blocking mode on the new socket.
     pub fn nonblock(mut self) -> Self {
-        self.0 |= libc::SOCK_NONBLOCK as isize;
+        self.0 |= SOCK_NONBLOCK as isize;
         self
     }
 
     /// Set close-on-exec on the new descriptor.
     pub fn cloexec(mut self) -> Self {
-        self.0 |= libc::SOCK_CLOEXEC as isize;
+        self.0 |= SOCK_CLOEXEC as isize;
         self
     }
 }
@@ -73,8 +80,8 @@ impl SockFlags {
 impl core::fmt::Debug for SockFlags {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("SockFlags")
-            .field("NONBLOCK", &(self.0 & libc::SOCK_NONBLOCK as isize > 0))
-            .field("CLOEXEC", &(self.0 & libc::SOCK_CLOEXEC as isize > 0))
+            .field("NONBLOCK", &(self.0 & SOCK_NONBLOCK as isize > 0))
+            .field("CLOEXEC", &(self.0 & SOCK_CLOEXEC as isize > 0))
             .finish()
     }
 }

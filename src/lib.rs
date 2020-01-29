@@ -18,10 +18,10 @@ use std::path::PathBuf;
 
 use libc::{SHUT_RD, SHUT_RDWR, SHUT_WR};
 
-use linux_sys::errno::ERANGE;
-use linux_sys::fcntl::{flock, AT_FDCWD, O_CLOEXEC, O_CREAT, O_LARGEFILE, O_TMPFILE};
-use linux_sys::fs::{PATH_MAX, RENAME_EXCHANGE, RENAME_NOREPLACE};
-use linux_sys::time::timeval;
+use linux_sys::{
+    flock, timeval, AT_FDCWD, ERANGE, O_CLOEXEC, O_CREAT, O_LARGEFILE, O_TMPFILE, PATH_MAX,
+    RENAME_EXCHANGE, RENAME_NOREPLACE,
+};
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
 // TODO: Is there a better way to do this? https://github.com/rust-lang/rfcs/issues/2784
@@ -337,8 +337,7 @@ pub unsafe fn fcntl<F: AsRawFd>(fd: F, cmd: u32, arg: FcntlArg<'_>) -> io::Resul
 #[cfg(test)]
 mod tests {
     use super::write;
-    use linux_sys::fcntl::{O_CLOEXEC, O_RDWR, O_SYNC};
-    use linux_sys::signal::SIGTERM;
+    use linux_sys::{O_CLOEXEC, O_RDWR, O_SYNC, SIGTERM};
     use std::env;
     use std::ffi::{CStr, CString};
     use std::fs::{remove_file, File, OpenOptions};
