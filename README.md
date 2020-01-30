@@ -18,6 +18,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
 12. Should we feature gate per linux kernel version? Is there a way to check this at compile/runtime? (for new features).
 13. Should we split the high level syscalls into a files/net etc. modules?.
 14. glibc seems to use `fnctl` for dup*. what should we do?.
+15. `setuid` by itself isn't thread safe, glibc uses `INLINE_SETXID_SYSCALL` and musl `__setxid`, what should we do?
 
 ## Guidelines (For now - IMHO)
 1. This library should only expose syscalls for Linux 3.2+ for now https://github.com/rust-lang/libc/issues/1412#issuecomment-543621431.
@@ -80,7 +81,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] accept
  - [x] shutdown
  - [x] chdir
- - [ ] getuid
+ - [x] getuid
  - [ ] getpid
  - [ ] getppid
  - [ ] pipe2
@@ -89,7 +90,7 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
  - [ ] fork
  - [x] _exit
  - [x] dup2
- - [ ] setgid
+ - [x] setgid
  - [ ] setgroups
  - [ ] setuid
  - [ ] waitpid

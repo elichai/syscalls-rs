@@ -276,6 +276,19 @@ pub unsafe fn chmod(path: &CStr, mode: u32) -> io::Result<usize> {
     result!(res)
 }
 
+#[inline]
+pub unsafe fn getuid() -> io::Result<u32> {
+    let res = syscall!(Syscalls::Getuid);
+    result!(res)
+}
+
+// TODO: Not thread safe. see open question 15.
+#[inline]
+pub unsafe fn setuid(id: u32) -> io::Result<()> {
+    let res = syscall!(Syscalls::Setuid, id as isize);
+    result_none!(res)
+}
+
 pub enum FcntlArg<'a> {
     Flock(&'a mut flock),
     Flags(u32),
@@ -366,7 +379,8 @@ mod tests {
         pub fn generate_new_path() -> PathBuf {
             static FILES_COUNTER: AtomicU8 = AtomicU8::new(0);
             let curr = FILES_COUNTER.fetch_add(1, Ordering::Relaxed);
-            PathBuf::from(&format!("{}.testfile", curr))
+            let path = PathBuf::from(".").canonicalize().unwrap();
+            path.join(&format!("{}.testfile", curr))
         }
 
         pub fn from_path_delete(path: PathBuf, delete: bool) -> io::Result<Self> {
@@ -549,6 +563,7 @@ mod tests {
     fn test_mkdir_rmdir() {
         let path = TestFile::generate_new_path();
         let c_path = path_to_cstr(&path);
+        println!("{:?}", path);
         let res = unsafe { super::mkdir(&c_path, O_RDWR) }.unwrap();
         assert_eq!(res, 0);
         assert!(path.exists());
@@ -568,6 +583,19 @@ mod tests {
     fn test_exit_fail() {
         super::_exit(1);
     }
+
+    #[test]
+    #[ignore]
+    // root only.
+    fn test_getuid() {
+        unsafe {
+            let orig = super::getuid().unwrap();
+            super::setuid(7500).unwrap();
+            assert_ne!(super::getuid().unwrap(), orig);
+        }
+
+    }
+
 
     #[test]
     fn test_open() {

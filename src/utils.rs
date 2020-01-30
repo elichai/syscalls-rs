@@ -16,7 +16,14 @@ macro_rules! result {
             // TODO: Add our own Error enum with all the errors in errno.h
             Err(::std::io::Error::from_raw_os_error(-$res as i32))
         } else {
-            Ok($res as usize)
+            Ok($res as _)
         }
+    };
+}
+
+#[macro_export]
+macro_rules! result_none {
+    ($res:path) => {
+        result!($res).map(|r: usize| {debug_assert_eq!(r, 0); ()})
     };
 }
