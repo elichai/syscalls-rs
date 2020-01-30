@@ -1,10 +1,11 @@
 [package]
 name = "linux-sys"
-version = "0.0.0"
+version = "0.0.1-pre+5.4.0"
 authors = ["Elichai Turkel <elichai.turkel@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"
-repository = "https://github.com/elichai/syscalls-rs"
+repository = "https://github.com/elichai/syscalls-rs/tree/master/linux-sys"
+readme = "README.md"
 categories = ["external-ffi-bindings"]
 keywords = ["ffi", "linux", "uapi", "posix", "libc"]
 description = "FFI bindings to linux UAPI"
@@ -21,4 +22,7 @@ include = [
 cty = { version = "0.2.1", optional = true }
 
 [build-dependencies]
-bindgen = {version = "0.51", default-features = false, features = ["which-rustfmt"] }
+bindgen = {version = "0.52", default-features = false, features = ["which-rustfmt"] }
+
+[badges]
+travis-ci = { repository = "elichai/log-derive" }
