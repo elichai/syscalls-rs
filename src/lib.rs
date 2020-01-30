@@ -424,8 +424,7 @@ mod tests {
         pub fn generate_new_path() -> PathBuf {
             static FILES_COUNTER: AtomicU8 = AtomicU8::new(0);
             let curr = FILES_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let path = PathBuf::from(".").canonicalize().unwrap();
-            path.join(&format!("{}.testfile", curr))
+            PathBuf::from(format!("{}.testfile", curr))
         }
 
         pub fn from_path_delete(path: PathBuf, delete: bool) -> io::Result<Self> {
