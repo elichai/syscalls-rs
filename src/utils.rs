@@ -24,6 +24,9 @@ macro_rules! result {
 #[macro_export]
 macro_rules! result_none {
     ($res:path) => {
-        result!($res).map(|r: usize| {debug_assert_eq!(r, 0); ()})
+        result!($res).map(|r: usize| {
+            debug_assert_eq!(r, 0);
+            ()
+        })
     };
 }

@@ -26,6 +26,12 @@ looking at glibc code it does some work and then calls `fcntl64`. should we just
 3. Try to gain the most safety possible if it's zero cost. if not a case by case consideration is required. (preferably compile time safety).
 
 
+### AArch64 requires us to only use the *at syscalls, so replace the following:
+- [x] open - openat
+- [x] mkdir - mkdirat
+- [x] rmdir - rmdirat
+- [x] chmod - chmodat
+
 ## List of syscalls used in rust/src/libstd:
 ### Kernel Calls(2)
  - [ ] ftruncate

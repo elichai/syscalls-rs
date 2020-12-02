@@ -19,8 +19,8 @@ use std::path::PathBuf;
 use libc::{SHUT_RD, SHUT_RDWR, SHUT_WR};
 
 use linux_sys::{
-    flock, timeval, AT_FDCWD, ERANGE, O_CLOEXEC, O_CREAT, O_LARGEFILE, O_TMPFILE, PATH_MAX,
-    RENAME_EXCHANGE, RENAME_NOREPLACE,
+    flock, timeval, AT_FDCWD, AT_REMOVEDIR, ERANGE, O_CLOEXEC, O_CREAT, O_LARGEFILE, O_TMPFILE,
+    PATH_MAX, RENAME_EXCHANGE, RENAME_NOREPLACE,
 };
 
 // Checking that RawFd, raw pointers, and usize can all be losslessly casted into isize. (without losing bits)
@@ -65,10 +65,15 @@ pub unsafe fn read<F: AsRawFd>(fd: &F, buf: &mut [u8]) -> io::Result<usize> {
     result!(res)
 }
 
-// TODO: Should we just call openat? (that's what glibc and the kernel itself do).
 // In kernels older than 3.2 this requires a special racy handling for FD_CLOEXEC. But rust doesn't support these kernels anyway https://github.com/rust-lang/libc/issues/1412#issuecomment-543621431
+// TODO should we make `relative_to` an option with CWD as default?
 #[inline]
-pub unsafe fn open(path: &CStr, oflags: u32, mode: Option<u32>) -> io::Result<usize> {
+pub unsafe fn openat<F: AsRawFd>(
+    relative_to: &F,
+    path: &CStr,
+    oflags: u32,
+    mode: Option<u32>,
+) -> io::Result<usize> {
     // TODO: Look into a `#ifdef __O_TMPFILE` in glibc. are there times when we don't care about this? Maybe old kernels?.
     let mut mode_t = 0;
     if (oflags & O_CREAT) != 0 || (oflags & O_TMPFILE) == O_TMPFILE {
@@ -82,12 +87,18 @@ pub unsafe fn open(path: &CStr, oflags: u32, mode: Option<u32>) -> io::Result<us
         }
     }
     let res = syscall!(
-        Syscalls::Open,
+        Syscalls::Openat,
+        relative_to.as_raw_fd() as isize,
         path.as_ptr() as isize,
         oflags as isize,
         mode_t as isize
     );
     result!(res)
+}
+
+// TODO: Should we deprecate this?
+pub unsafe fn open(path: &CStr, oflags: u32, mode: Option<u32>) -> io::Result<usize> {
+    openat(&CURRENT_CWD_FD, path, oflags, mode)
 }
 
 // TODO: maybe this should just be the default?.
@@ -107,19 +118,41 @@ pub fn _exit(status: i32) -> ! {
     }
 }
 
-// TODO: glibc just calls mkdirat with AT_FDCWD. musl has this as an ifdef. what should we do?.
-// TODO: Should we return Result<()>?.
+// TODO should we make `relative_to` an option with CWD as default?
 #[inline]
-pub unsafe fn mkdir(path: &CStr, mode: u32) -> io::Result<usize> {
-    let res = syscall!(Syscalls::Mkdir, path.as_ptr() as isize, mode as isize);
-    result!(res)
+pub unsafe fn mkdirat<F: AsRawFd>(relative_to: &F, path: &CStr, mode: u32) -> io::Result<()> {
+    let res = syscall!(
+        Syscalls::Mkdirat,
+        relative_to.as_raw_fd() as isize,
+        path.as_ptr() as isize,
+        mode as isize
+    );
+    result_none!(res)
 }
 
-// TODO: same comments as for mkdir but here it's `mrdir` vs `unlinkat`
+// TODO: Should we deprecate this?
 #[inline]
-pub unsafe fn rmdir(path: &CStr) -> io::Result<usize> {
-    let res = syscall!(Syscalls::Rmdir, path.as_ptr() as isize);
-    result!(res)
+pub unsafe fn mkdir(path: &CStr, mode: u32) -> io::Result<()> {
+    mkdirat(&CURRENT_CWD_FD, path, mode)
+}
+
+
+// TODO: same comments as for mkdir and open
+#[inline]
+pub unsafe fn unlinkat<F: AsRawFd>(relative_to: &F, path: &CStr, is_dir: bool) -> io::Result<()> {
+    let flags = if is_dir { AT_REMOVEDIR } else { 0 };
+    let res = syscall!(
+        Syscalls::Unlinkat,
+        relative_to.as_raw_fd() as isize,
+        path.as_ptr() as isize,
+        flags as isize
+    );
+    result_none!(res)
+}
+
+#[inline]
+pub unsafe fn rmdir(path: &CStr) -> io::Result<()> {
+    unlinkat(&CURRENT_CWD_FD, path, true)
 }
 
 // TODO: musl has an aio barrier, glibc uses SYSCALL_CANCEL. what should we do here?.
@@ -269,11 +302,23 @@ pub unsafe fn shutdown<F: AsRawFd>(socket: &F, how: Shutdown) -> io::Result<usiz
     result!(res)
 }
 
+
+
+pub unsafe fn fchmodat<F: AsRawFd>(relative_to: &F, path: &CStr, mode: u32) -> io::Result<()> {
+    let res = syscall!(
+        Syscalls::Fchmodat,
+        relative_to.as_raw_fd() as isize,
+        path.as_ptr() as isize,
+        mode as isize
+    );
+    result_none!(res)
+}
+
+
 // TODO: Same question as in `open(2)`. should we just implement `fchmodat(2)` and call that?.
 #[inline]
-pub unsafe fn chmod(path: &CStr, mode: u32) -> io::Result<usize> {
-    let res = syscall!(Syscalls::Chmod, path.as_ptr() as isize, mode as isize,);
-    result!(res)
+pub unsafe fn chmod(path: &CStr, mode: u32) -> io::Result<()> {
+    fchmodat(&CURRENT_CWD_FD, path, mode)
 }
 
 #[inline]
@@ -379,8 +424,7 @@ mod tests {
         pub fn generate_new_path() -> PathBuf {
             static FILES_COUNTER: AtomicU8 = AtomicU8::new(0);
             let curr = FILES_COUNTER.fetch_add(1, Ordering::Relaxed);
-            let path = PathBuf::from(".").canonicalize().unwrap();
-            path.join(&format!("{}.testfile", curr))
+            PathBuf::from(format!("{}.testfile", curr))
         }
 
         pub fn from_path_delete(path: PathBuf, delete: bool) -> io::Result<Self> {
@@ -433,8 +477,7 @@ mod tests {
         let p_path = file.path().to_owned();
         let path = path_to_cstr(&p_path);
         drop(file);
-        let res = unsafe { super::chmod(&path, 0o000) }.unwrap();
-        assert_eq!(res, 0);
+        unsafe { super::chmod(&path, 0o000) }.unwrap();
         let err = unsafe { super::open(&path, O_CLOEXEC | O_SYNC | O_RDWR, None) }.unwrap_err();
         assert_eq!(err.kind(), io::ErrorKind::PermissionDenied);
         assert_eq!(err.to_string(), "Permission denied (os error 13)");
@@ -564,11 +607,9 @@ mod tests {
         let path = TestFile::generate_new_path();
         let c_path = path_to_cstr(&path);
         println!("{:?}", path);
-        let res = unsafe { super::mkdir(&c_path, O_RDWR) }.unwrap();
-        assert_eq!(res, 0);
+        unsafe { super::mkdir(&c_path, O_RDWR) }.unwrap();
         assert!(path.exists());
-        let res = unsafe { super::rmdir(&c_path) }.unwrap();
-        assert_eq!(res, 0);
+        unsafe { super::rmdir(&c_path) }.unwrap();
         assert!(!path.exists());
     }
 
@@ -593,9 +634,7 @@ mod tests {
             super::setuid(7500).unwrap();
             assert_ne!(super::getuid().unwrap(), orig);
         }
-
     }
-
 
     #[test]
     fn test_open() {
