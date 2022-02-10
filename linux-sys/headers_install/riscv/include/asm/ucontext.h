@@ -5,8 +5,8 @@
  *
  * This file was copied from arch/arm64/include/uapi/asm/ucontext.h
  */
-#ifndef __ASM_UCONTEXT_H
-#define __ASM_UCONTEXT_H
+#ifndef _ASM_RISCV_UCONTEXT_H
+#define _ASM_RISCV_UCONTEXT_H
 
 #include <linux/types.h>
 
@@ -31,4 +31,4 @@ struct ucontext {
 	struct sigcontext uc_mcontext;
 };
 
-#endif /* __ASM_UCONTEXT_H */
+#endif /* _ASM_RISCV_UCONTEXT_H */

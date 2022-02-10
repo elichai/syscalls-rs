@@ -1,6 +1,6 @@
 [package]
 name = "linux-sys"
-version = "0.0.1-pre+5.4.0"
+version = "0.0.1-pre+5.6.0"
 authors = ["Elichai Turkel <elichai.turkel@gmail.com>"]
 edition = "2018"
 license = "MIT/Apache-2.0"

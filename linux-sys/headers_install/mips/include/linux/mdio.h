@@ -53,12 +53,14 @@
 #define MDIO_AN_EEE_LPABLE	61	/* EEE link partner ability */
 #define MDIO_AN_EEE_ADV2	62	/* EEE advertisement 2 */
 #define MDIO_AN_EEE_LPABLE2	63	/* EEE link partner ability 2 */
+#define MDIO_AN_CTRL2		64	/* AN THP bypass request control */
 
 /* Media-dependent registers. */
 #define MDIO_PMA_10GBT_SWAPPOL	130	/* 10GBASE-T pair swap & polarity */
 #define MDIO_PMA_10GBT_TXPWR	131	/* 10GBASE-T TX power control */
 #define MDIO_PMA_10GBT_SNR	133	/* 10GBASE-T SNR margin, lane A.
 					 * Lanes B-D are numbered 134-136. */
+#define MDIO_PMA_10GBR_FSRT_CSR	147	/* 10GBASE-R fast retrain status and control */
 #define MDIO_PMA_10GBR_FECABLE	170	/* 10GBASE-R FEC ability */
 #define MDIO_PCS_10GBX_STAT1	24	/* 10GBASE-X PCS status 1 */
 #define MDIO_PCS_10GBRT_STAT1	32	/* 10GBASE-R/-T PCS status 1 */
@@ -120,6 +122,8 @@
 #define MDIO_PMA_SPEED_100		0x0020	/* 100M capable */
 #define MDIO_PMA_SPEED_10		0x0040	/* 10M capable */
 #define MDIO_PCS_SPEED_10P2B		0x0002	/* 10PASS-TS/2BASE-TL capable */
+#define MDIO_PCS_SPEED_2_5G		0x0040	/* 2.5G capable */
+#define MDIO_PCS_SPEED_5G		0x0080	/* 5G capable */
 
 /* Device present registers. */
 #define MDIO_DEVS_PRESENT(devad)	(1 << (devad))
@@ -237,6 +241,9 @@
 #define MDIO_PMA_10GBR_FECABLE_ABLE	0x0001	/* FEC ability */
 #define MDIO_PMA_10GBR_FECABLE_ERRABLE	0x0002	/* FEC error indic. ability */
 
+/* PMA 10GBASE-R Fast Retrain status and control register. */
+#define MDIO_PMA_10GBR_FSRT_ENABLE	0x0001	/* Fast retrain enable */
+
 /* PCS 10GBASE-R/-T status register 1. */
 #define MDIO_PCS_10GBRT_STAT1_BLKLK	0x0001	/* Block lock attained */
 
@@ -245,6 +252,7 @@
 #define MDIO_PCS_10GBRT_STAT2_BER	0x3f00
 
 /* AN 10GBASE-T control register. */
+#define MDIO_AN_10GBT_CTRL_ADVFSRT2_5G	0x0020	/* Advertise 2.5GBASE-T fast retrain */
 #define MDIO_AN_10GBT_CTRL_ADV2_5G	0x0080	/* Advertise 2.5GBASE-T */
 #define MDIO_AN_10GBT_CTRL_ADV5G	0x0100	/* Advertise 5GBASE-T */
 #define MDIO_AN_10GBT_CTRL_ADV10G	0x1000	/* Advertise 10GBASE-T */
@@ -287,6 +295,9 @@
 #define MDIO_EEE_2_5GT		0x0001	/* 2.5GT EEE cap */
 #define MDIO_EEE_5GT		0x0002	/* 5GT EEE cap */
 
+/* AN MultiGBASE-T AN control 2 */
+#define MDIO_AN_THP_BP2_5GT	0x0008	/* 2.5GT THP bypass request */
+
 /* 2.5G/5G Extended abilities register. */
 #define MDIO_PMA_NG_EXTABLE_2_5GBT	0x0001	/* 2.5GBASET ability */
 #define MDIO_PMA_NG_EXTABLE_5GBT	0x0002	/* 5GBASET ability */
@@ -323,5 +334,31 @@ static __inline__ __u16 mdio_phy_id_c45(int prtad, int devad)
 {
 	return MDIO_PHY_ID_C45 | (prtad << 5) | devad;
 }
+
+/* UsxgmiiChannelInfo[15:0] for USXGMII in-band auto-negotiation.*/
+#define MDIO_USXGMII_EEE_CLK_STP	0x0080	/* EEE clock stop supported */
+#define MDIO_USXGMII_EEE		0x0100	/* EEE supported */
+#define MDIO_USXGMII_SPD_MASK		0x0e00	/* USXGMII speed mask */
+#define MDIO_USXGMII_FULL_DUPLEX	0x1000	/* USXGMII full duplex */
+#define MDIO_USXGMII_DPX_SPD_MASK	0x1e00	/* USXGMII duplex and speed bits */
+#define MDIO_USXGMII_10			0x0000	/* 10Mbps */
+#define MDIO_USXGMII_10HALF		0x0000	/* 10Mbps half-duplex */
+#define MDIO_USXGMII_10FULL		0x1000	/* 10Mbps full-duplex */
+#define MDIO_USXGMII_100		0x0200	/* 100Mbps */
+#define MDIO_USXGMII_100HALF		0x0200	/* 100Mbps half-duplex */
+#define MDIO_USXGMII_100FULL		0x1200	/* 100Mbps full-duplex */
+#define MDIO_USXGMII_1000		0x0400	/* 1000Mbps */
+#define MDIO_USXGMII_1000HALF		0x0400	/* 1000Mbps half-duplex */
+#define MDIO_USXGMII_1000FULL		0x1400	/* 1000Mbps full-duplex */
+#define MDIO_USXGMII_10G		0x0600	/* 10Gbps */
+#define MDIO_USXGMII_10GHALF		0x0600	/* 10Gbps half-duplex */
+#define MDIO_USXGMII_10GFULL		0x1600	/* 10Gbps full-duplex */
+#define MDIO_USXGMII_2500		0x0800	/* 2500Mbps */
+#define MDIO_USXGMII_2500HALF		0x0800	/* 2500Mbps half-duplex */
+#define MDIO_USXGMII_2500FULL		0x1800	/* 2500Mbps full-duplex */
+#define MDIO_USXGMII_5000		0x0a00	/* 5000Mbps */
+#define MDIO_USXGMII_5000HALF		0x0a00	/* 5000Mbps half-duplex */
+#define MDIO_USXGMII_5000FULL		0x1a00	/* 5000Mbps full-duplex */
+#define MDIO_USXGMII_LINK		0x8000	/* PHY link with copper-side partner */
 
 #endif /* __LINUX_MDIO_H__ */
