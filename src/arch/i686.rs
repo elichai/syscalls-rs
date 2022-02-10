@@ -1,51 +1,116 @@
 #![allow(dead_code)]
+use std::arch::asm;
 
 #[inline]
 #[rustfmt::skip]
 pub unsafe fn syscall0(mut n: isize) -> isize {
-    asm! {"int $$0x80", inlateout("eax") n, options(nostack)};
+    asm! {"int $0x80", inlateout("eax") n, options(nostack)};
     n
 }
 
 #[inline]
 #[rustfmt::skip]
 pub unsafe fn syscall1(mut n: isize, a1: isize) -> isize {
-    asm! {"int $$0x80", inlateout("eax") n, in("ebx") a1, options(nostack)};
+    asm! {"int $0x80", inlateout("eax") n, in("ebx") a1, options(nostack)};
     n
 }
 
 #[inline]
 #[rustfmt::skip]
 pub unsafe fn syscall2(mut n: isize, a1: isize, a2: isize) -> isize {
-    asm! {"int $$0x80", inlateout("eax") n, in("ebx") a1, in("ecx") a2, options(nostack)};
+    asm! {"int $0x80", inlateout("eax") n, in("ebx") a1, in("ecx") a2, options(nostack)};
     n
 }
 
 #[inline]
 #[rustfmt::skip]
 pub unsafe fn syscall3(mut n: isize, a1: isize, a2: isize, a3: isize) -> isize {
-    asm! {"int $$0x80", inlateout("eax") n, in("ebx") a1, in("ecx") a2, in("edx") a3, options(nostack)};
+    asm! {"int $0x80", inlateout("eax") n, in("ebx") a1, in("ecx") a2, in("edx") a3, options(nostack)};
     n
 }
 
 #[inline]
 #[rustfmt::skip]
 pub unsafe fn syscall4(mut n: isize, a1: isize, a2: isize, a3: isize, a4: isize) -> isize {
-    asm! {"int $$0x80", inlateout("eax") n, in("ebx") a1, in("ecx") a2, in("edx") a3, in("esi") a4, options(nostack)};
+    asm! {"
+        .if {a4} != esi
+            push esi
+            mov esi, {a4}
+        .endif
+
+        int $0x80
+
+        .if {a4} != esi
+            pop esi
+        .endif
+        ",
+    a4 = in(reg) a4,
+    inlateout("eax") n,
+    in("ebx") a1,
+    in("ecx") a2,
+    in("edx") a3,
+    options(nostack)
+    };
     n
 }
 
 #[inline]
 #[rustfmt::skip]
 pub unsafe fn syscall5(mut n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5: isize) -> isize {
-    asm! {"int $$0x80", inlateout("eax") n, in("ebx") a1, in("ecx") a2, in("edx") a3, in("esi") a4, in("edi") a5, options(nostack)};
+    asm! {"
+        .if {a4} != esi
+            push esi
+            mov esi, {a4}
+        .endif
+
+        int $0x80
+
+        .if {a4} != esi
+            pop esi
+        .endif
+        ",
+    a4 = in(reg) a4,
+    inlateout("eax") n,
+    in("ebx") a1,
+    in("ecx") a2,
+    in("edx") a3,
+    in("edi") a5,
+    options(nostack)
+    };
     n
 }
 
 #[inline]
 #[rustfmt::skip]
 pub unsafe fn syscall6(mut n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5: isize, a6: isize) -> isize {
-    asm! {"int $$0x80", inlateout("eax") n, in("ebx") a1, in("ecx") a2, in("edx") a3, in("esi") a4, in("edi") a5, in("ebp") a6, options(nostack)};
+    asm! {"
+        .if {a4} != esi
+            push esi
+            mov esi, {a4}
+        .endif
+        .if {a6} != ebp
+            push ebp
+            mov ebp {a6}
+        .endif
+
+        int $0x80
+
+        .if {a4} != esi
+            pop esi
+        .endif
+        .if {a6} != ebp
+            pop ebp
+        .endif
+        ",
+    a4 = in(reg) a4,
+    a6 = in(reg) a6,
+    inlateout("eax") n,
+    in("ebx") a1,
+    in("ecx") a2,
+    in("edx") a3,
+    in("edi") a5,
+    options(nostack)
+    };
     n
 }
 
