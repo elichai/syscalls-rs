@@ -1,0 +1,101 @@
+# Based on https://github.com/actions-rs/meta/blob/master/recipes/quickstart.md
+
+on: [push, pull_request]
+
+name: Continuous Integration
+
+jobs:
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target: [ x86_64-unknown-linux-gnu, i686-unknown-linux-gnu ]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: sudo apt-get -yq install libclang-dev
+
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Run cargo check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --verbose --tests --all --target=${{ matrix.target }}
+
+  test:
+    name: Test Suite
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-18.04]
+        target: [x86_64-unknown-linux-gnu, i686-unknown-linux-gnu]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: sudo apt-get -yq install gcc-multilib libclang-dev clang llvm
+
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --verbose --all --target=${{ matrix.target }}
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --all --target=${{ matrix.target }}
+
+  test-release:
+    name: Test Suite Release
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-20.04, ubuntu-18.04]
+        target: [x86_64-unknown-linux-gnu, i686-unknown-linux-gnu]
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: sudo apt-get -yq install gcc-multilib libclang-dev clang llvm
+
+      - name: Install toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          target: ${{ matrix.target }}
+          override: true
+
+      - name: Run cargo build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --verbose --release --all --target=${{ matrix.target }}
+
+      - name: Run cargo test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --verbose --release --all --target=${{ matrix.target }}
