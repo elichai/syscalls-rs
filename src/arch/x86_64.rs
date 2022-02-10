@@ -1,64 +1,60 @@
 #![allow(dead_code)]
+use std::arch::asm;
 
 #[inline]
 #[rustfmt::skip]
-pub unsafe fn syscall0(n: isize) -> isize {
-    let mut ret: usize;
-    asm! {"syscall": "={rax}"(ret) : "{rax}"(n) : "cc", "rcx", "r11", "memory" : "volatile"};
-    ret as isize
+pub unsafe fn syscall0(mut n: isize) -> isize {
+    asm! {"syscall", inlateout("rax") n,
+          out("rcx") _, out("r11") _, options(nostack)};
+    n
 }
 
 #[inline]
 #[rustfmt::skip]
-pub unsafe fn syscall1(n: isize, a1: isize) -> isize {
-    let mut ret: usize;
-    asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) : "cc", "rcx", "r11", "memory" : "volatile"};
-    ret as isize
+pub unsafe fn syscall1(mut n: isize, a1: isize) -> isize {
+    asm! {"syscall", inlateout("rax") n, in("rdi") a1,
+          out("rcx") _, out("r11") _, options(nostack)};
+    n
 }
 
 #[inline]
 #[rustfmt::skip]
-pub unsafe fn syscall2(n: isize, a1: isize, a2: isize) -> isize {
-    let mut ret: usize;
-    asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2)
-          : "cc", "rcx", "r11", "memory" : "volatile"};
-    ret as isize
+pub unsafe fn syscall2(mut n: isize, a1: isize, a2: isize) -> isize {
+    asm! {"syscall", inlateout("rax") n, in("rdi") a1, in("rsi") a2,
+          out("rcx") _, out("r11") _, options(nostack)};
+    n
 }
 
 #[inline]
 #[rustfmt::skip]
-pub unsafe fn syscall3(n: isize, a1: isize, a2: isize, a3: isize) -> isize {
-    let mut ret: usize;
-    asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
-          "{rdx}"(a3) : "cc", "rcx", "r11", "memory" : "volatile"};
-    ret as isize
+pub unsafe fn syscall3(mut n: isize, a1: isize, a2: isize, a3: isize) -> isize {
+    asm! {"syscall", inlateout("rax") n, in("rdi") a1, in("rsi") a2, in("rdx") a3,
+          out("rcx") _, out("r11") _, options(nostack)};
+    n
 }
 
 #[inline]
 #[rustfmt::skip]
-pub unsafe fn syscall4(n: isize, a1: isize, a2: isize, a3: isize, a4: isize) -> isize {
-    let mut ret: usize;
-    asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
-          "{rdx}"(a3), "{r10}"(a4) : "cc", "rcx", "r11", "memory" : "volatile"};
-    ret as isize
+pub unsafe fn syscall4(mut n: isize, a1: isize, a2: isize, a3: isize, a4: isize) -> isize {
+    asm! {"syscall", inlateout("rax") n, in("rdi") a1, in("rsi") a2, in("rdx") a3, in("r10") a4,
+          out("rcx") _, out("r11") _, options(nostack)};
+    n
 }
 
 #[inline]
 #[rustfmt::skip]
-pub unsafe fn syscall5(n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5: isize) -> isize {
-    let mut ret: usize;
-    asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
-          "{rdx}"(a3), "{r10}"(a4), "{r8}"(a5) : "cc", "rcx", "r11", "memory" : "volatile"};
-    ret as isize
+pub unsafe fn syscall5(mut n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5: isize) -> isize {
+    asm! {"syscall", inlateout("rax") n, in("rdi") a1, in("rsi") a2, in("rdx") a3, in("r10") a4, in("r8") a5,
+          out("rcx") _, out("r11") _, options(nostack)};
+    n
 }
 
 #[inline]
 #[rustfmt::skip]
-pub unsafe fn syscall6(n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5: isize, a6: isize) -> isize {
-    let mut ret: usize;
-    asm! {"syscall": "={rax}"(ret) : "{rax}"(n), "{rdi}"(a1) , "{rsi}"(a2),
-          "{rdx}"(a3), "{r10}"(a4), "{r8}"(a5), "{r9}"(a6) : "cc", "rcx", "r11", "memory" : "volatile"};
-    ret as isize
+pub unsafe fn syscall6(mut n: isize, a1: isize, a2: isize, a3: isize, a4: isize, a5: isize, a6: isize) -> isize {
+    asm! {"syscall", inlateout("rax") n, in("rdi") a1, in("rsi") a2, in("rdx") a3, in("r10") a4, in("r8") a5, in("r9") a6,
+          out("rcx") _, out("r11") _, options(nostack)};
+    n
 }
 
 #[allow(dead_code)]

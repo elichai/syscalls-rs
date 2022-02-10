@@ -1,4 +1,4 @@
-#![feature(asm)]
+#![feature(io_error_uncategorized)]
 #![allow(clippy::missing_safety_doc)]
 
 mod arch;
@@ -41,7 +41,7 @@ const CURRENT_CWD_FD: FileDescriptor = FileDescriptor(AT_FDCWD as _);
 
 // TODO: Is there any way to make this safe? https://github.com/rust-lang/rfcs/issues/1043#issuecomment-542904091
 // TODO: Read into all ways that writing the a "bad" file descriptor violate rust's safety.
-// TODO: Or find a way to make a trait that shifts the responsibility of saftey to the implementor of the trait.
+// TODO: Or find a way to make a trait that shifts the responsibility of safety to the implementor of the trait.
 // TODO Update: So if we have an unsafe trait for `AsRawFd` than that will shift the responsibility to the implementor and should allow us to make this function safe.
 #[inline]
 pub unsafe fn write<F: AsRawFd>(fd: &mut F, msg: &[u8]) -> io::Result<usize> {
@@ -555,7 +555,7 @@ mod tests {
         let res = unsafe { super::close(file.deref()) }.unwrap();
         assert_eq!(res, 0);
         let err = unsafe { super::close(file.deref()) }.unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::Other);
+        assert_eq!(err.kind(), io::ErrorKind::Uncategorized);
         assert_eq!(err.to_string(), "Bad file descriptor (os error 9)");
     }
 
@@ -593,9 +593,7 @@ mod tests {
             super::setuid(7500).unwrap();
             assert_ne!(super::getuid().unwrap(), orig);
         }
-
     }
-
 
     #[test]
     fn test_open() {
@@ -639,7 +637,7 @@ mod tests {
         let res = unsafe { write(&mut DUMMY_FD, msg.as_bytes()) };
         assert!(res.is_err());
         let err = res.unwrap_err();
-        assert_eq!(err.kind(), io::ErrorKind::Other);
+        assert_eq!(err.kind(), io::ErrorKind::Uncategorized);
         assert_eq!(err.to_string(), "Bad file descriptor (os error 9)");
     }
 }

@@ -32,5 +32,5 @@ linux-sys = "5.4"
 ## Minimum Supported Rust Version (MSRV)
 Currently it officially supports only rust nightly, because most interaction with the kernel requires assembly anyway.
 In practice both `beta` and `stable` are tested in the CI.
-but I do plan to add an autodetect feature to [bindgen](https://github.com/rust-lang/rust-bindgen)] such that it will work with whatever version [bindgen](https://github.com/rust-lang/rust-bindgen)] can generate for.
+but I do plan to add an autodetect feature to [bindgen](https://github.com/rust-lang/rust-bindgen) such that it will work with whatever version [bindgen](https://github.com/rust-lang/rust-bindgen) can generate for.
 
